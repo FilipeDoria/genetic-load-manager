@@ -1,0 +1,22 @@
+{
+  "domain": "genetic_load_manager",
+  "name": "Genetic Load Manager",
+  "documentation": "https://github.com/filipe0doria/genetic-load-manager",
+  "dependencies": [],
+  "codeowners": ["@filipe0doria"],
+  "requirements": [],
+  "iot_class": "local_polling",
+  "version": "1.0.0",
+  "config_flow": true,
+  "ssdp": [],
+  "zeroconf": [],
+  "homekit": {},
+  "dhcp": [],
+  "mqtt": [],
+  "bluetooth": [],
+  "usb": [],
+  "gps": [],
+  "cloud": [],
+  "webhook": [],
+  "integration_type": "device"
+} 

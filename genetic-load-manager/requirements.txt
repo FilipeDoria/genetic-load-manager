@@ -1,6 +1,0 @@
-Flask==2.3.3
-requests==2.31.0
-APScheduler==3.10.4
-deap==1.4.1
-python-dotenv==1.0.0
-gunicorn==21.2.0 

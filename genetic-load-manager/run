@@ -1,9 +1,0 @@
-#!/usr/bin/with-contenv bashio
-# ==============================================================================
-# Start the GA Load Manager service
-# ==============================================================================
-
-bashio::log.info "Starting GA Load Manager..."
-
-# Start the Python application
-exec python3 /app/app.py 
