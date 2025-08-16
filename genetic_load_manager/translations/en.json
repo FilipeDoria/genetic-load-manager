@@ -8,54 +8,8 @@
           "pv_entity_id": "PV Power Entity ID",
           "forecast_entity_id": "Forecast Entity ID",
           "battery_soc_entity_id": "Battery SOC Entity ID",
-          "price_entity_id": "Electricity Price Entity ID",
-          "optimization_interval": "Optimization Interval (minutes)",
-          "population_size": "Population Size",
-          "generations": "Generations",
-          "mutation_rate": "Mutation Rate",
-          "crossover_rate": "Crossover Rate"
+          "price_entity_id": "Electricity Price Entity ID"
         }
-      }
-    },
-    "error": {
-      "unknown": "Unknown error occurred",
-      "invalid_entity": "One or more entity IDs are invalid"
-    },
-    "abort": {
-      "already_configured": "Device is already configured"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Genetic Load Manager Options",
-        "description": "Adjust optimization parameters",
-        "data": {
-          "optimization_interval": "Optimization Interval (minutes)",
-          "population_size": "Population Size",
-          "generations": "Generations",
-          "mutation_rate": "Mutation Rate",
-          "crossover_rate": "Crossover Rate"
-        }
-      }
-    }
-  },
-  "entity": {
-    "sensor": {
-      "genetic_load_manager_status": {
-        "name": "Genetic Load Manager Status"
-      },
-      "genetic_load_manager_last_optimization": {
-        "name": "Last Optimization"
-      },
-      "genetic_load_manager_next_optimization": {
-        "name": "Next Optimization"
-      },
-      "genetic_load_manager_optimization_count": {
-        "name": "Optimization Count"
-      },
-      "genetic_load_manager_best_fitness": {
-        "name": "Best Fitness Score"
       }
     }
   }

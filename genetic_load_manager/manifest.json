@@ -7,16 +7,5 @@
   "requirements": [],
   "iot_class": "local_polling",
   "version": "1.0.0",
-  "config_flow": true,
-  "ssdp": [],
-  "zeroconf": [],
-  "homekit": {},
-  "dhcp": [],
-  "mqtt": [],
-  "bluetooth": [],
-  "usb": [],
-  "gps": [],
-  "cloud": [],
-  "webhook": [],
-  "integration_type": "device"
+  "config_flow": true
 } 
