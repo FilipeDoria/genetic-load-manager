@@ -2,5 +2,6 @@
   "name": "Genetic Load Manager",
   "render_readme": true,
   "domains": ["sensor"],
-  "homeassistant": "2023.8.0"
+  "homeassistant": "2023.8.0",
+  "content_in_root": false
 } 

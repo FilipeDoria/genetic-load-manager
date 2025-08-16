@@ -1,0 +1,1 @@
+DOMAIN = "genetic-load-manager"
