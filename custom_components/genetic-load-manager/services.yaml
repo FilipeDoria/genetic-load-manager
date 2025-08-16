@@ -1,0 +1,222 @@
+# Services for Genetic Load Manager
+
+optimize_loads:
+  name: "Optimize Loads"
+  description: "Trigger manual load optimization using genetic algorithm"
+  fields:
+    force:
+      name: "Force Optimization"
+      description: "Force optimization even if recently run"
+      selector:
+        boolean:
+          default: false
+    generations:
+      name: "Generations"
+      description: "Number of generations for this optimization run"
+      selector:
+        number:
+          min: 10
+          max: 500
+          default: 100
+          unit_of_measurement: "generations"
+
+apply_schedule:
+  name: "Apply Schedule"
+  description: "Apply the current optimized schedule to loads"
+  fields:
+    schedule_id:
+      name: "Schedule ID"
+      description: "ID of the schedule to apply (optional)"
+      selector:
+        text:
+          default: "current"
+    confirm:
+      name: "Confirm Action"
+      description: "Confirm that you want to apply this schedule"
+      selector:
+        boolean:
+          default: false
+
+reset_optimization:
+  name: "Reset Optimization"
+  description: "Reset optimization statistics and schedule"
+  fields:
+    confirm:
+      name: "Confirm Reset"
+      description: "Confirm that you want to reset optimization"
+      selector:
+        boolean:
+          default: false
+
+control_load:
+  name: "Control Load"
+  description: "Directly control a specific load"
+  fields:
+    entity_id:
+      name: "Entity ID"
+      description: "The entity ID of the load to control"
+      selector:
+        entity:
+          domain: switch
+          multiple: false
+    action:
+      name: "Action"
+      description: "Action to perform on the load"
+      selector:
+        select:
+          options:
+            - turn_on
+            - turn_off
+            - toggle
+          default: turn_on
+    priority:
+      name: "Priority"
+      description: "Priority level for this control action"
+      selector:
+        select:
+          options:
+            - low
+            - normal
+            - high
+            - critical
+          default: normal
+
+get_optimization_status:
+  name: "Get Optimization Status"
+  description: "Get current optimization status and statistics"
+  fields: {}
+
+get_algorithm_logs:
+  name: "Get Algorithm Logs"
+  description: "Get genetic algorithm optimization logs"
+  fields:
+    level:
+      name: "Log Level"
+      description: "Filter logs by level"
+      selector:
+        select:
+          options:
+            - all
+            - DEBUG
+            - INFO
+            - WARNING
+            - ERROR
+          default: all
+    limit:
+      name: "Log Limit"
+      description: "Maximum number of log entries to return"
+      selector:
+        number:
+          min: 1
+          max: 100
+          default: 50
+          unit_of_measurement: "entries"
+
+update_manageable_loads:
+  name: "Update Manageable Loads"
+  description: "Scan and update the list of manageable loads"
+  fields:
+    scan_switches:
+      name: "Scan Switch Entities"
+      description: "Scan for new switch entities"
+      selector:
+        boolean:
+          default: true
+    scan_lights:
+      name: "Scan Light Entities"
+      description: "Scan for light entities that can be controlled"
+      selector:
+        boolean:
+          default: false
+    custom_loads:
+      name: "Custom Loads"
+      description: "List of custom entity IDs to include"
+      selector:
+        target:
+          entity:
+            domain: switch
+            multiple: true
+
+set_optimization_parameters:
+  name: "Set Optimization Parameters"
+  description: "Update genetic algorithm parameters"
+  fields:
+    population_size:
+      name: "Population Size"
+      description: "Number of individuals in the population"
+      selector:
+        number:
+          min: 10
+          max: 200
+          default: 50
+          unit_of_measurement: "individuals"
+    generations:
+      name: "Generations"
+      description: "Number of generations per optimization"
+      selector:
+        number:
+          min: 10
+          max: 500
+          default: 100
+          unit_of_measurement: "generations"
+    mutation_rate:
+      name: "Mutation Rate"
+      description: "Probability of mutation per gene"
+      selector:
+        number:
+          min: 0.01
+          max: 0.5
+          default: 0.1
+          step: 0.01
+    crossover_rate:
+      name: "Crossover Rate"
+      description: "Probability of crossover between parents"
+      selector:
+        number:
+          min: 0.1
+          max: 1.0
+          default: 0.8
+          step: 0.1
+
+start_optimization:
+  name: "Start Optimization"
+  description: "Start the genetic algorithm optimization service"
+  fields:
+    auto_start:
+      name: "Auto Start"
+      description: "Automatically start optimization loop"
+      selector:
+        boolean:
+          default: true
+
+stop_optimization:
+  name: "Stop Optimization"
+  description: "Stop the genetic algorithm optimization service"
+  fields:
+    confirm:
+      name: "Confirm Stop"
+      description: "Confirm that you want to stop optimization"
+      selector:
+        boolean:
+          default: false
+
+export_schedule:
+  name: "Export Schedule"
+  description: "Export the current optimized schedule"
+  fields:
+    format:
+      name: "Export Format"
+      description: "Format for the exported schedule"
+      selector:
+        select:
+          options:
+            - json
+            - csv
+            - yaml
+          default: json
+    include_metadata:
+      name: "Include Metadata"
+      description: "Include optimization metadata in export"
+      selector:
+        boolean:
+          default: true 
