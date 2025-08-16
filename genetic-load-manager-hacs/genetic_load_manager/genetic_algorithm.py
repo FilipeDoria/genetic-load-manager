@@ -309,6 +309,9 @@ class GeneticLoadOptimizer:
         point1 = random.randint(0, len(parent1) - 2)
         point2 = random.randint(point1 + 1, len(parent1) - 1)
         
+        point1 = random.randint(0, len(parent1) - 2)
+        point2 = random.randint(point1 + 1, len(parent1) - 1)
+        
         child1 = parent1[:point1] + parent2[point1:point2] + parent1[point2:]
         child2 = parent2[:point1] + parent1[point1:point2] + parent2[point2:]
         
