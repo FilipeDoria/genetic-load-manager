@@ -1,0 +1,27 @@
+# Services for Genetic Load Manager
+
+optimize_loads:
+  name: "Optimize Loads"
+  description: "Trigger manual load optimization"
+  fields:
+    force:
+      name: "Force Optimization"
+      description: "Force optimization even if recently run"
+      selector:
+        boolean:
+          default: false
+
+apply_schedule:
+  name: "Apply Schedule"
+  description: "Apply the current optimized schedule"
+  fields:
+    schedule_id:
+      name: "Schedule ID"
+      description: "ID of the schedule to apply"
+      selector:
+        text:
+
+reset_optimization:
+  name: "Reset Optimization"
+  description: "Reset optimization statistics and schedule"
+  fields: {} 
