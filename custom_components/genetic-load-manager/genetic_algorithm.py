@@ -60,6 +60,21 @@ class GeneticLoadOptimizer:
         self._log_event("INFO", "Genetic Load Optimizer stopped")
         _LOGGER.info("Genetic Load Optimizer stopped")
     
+    async def run_optimization(self):
+        """Public method to run optimization manually."""
+        if not self.is_running:
+            _LOGGER.warning("Optimizer not running, cannot run optimization")
+            return
+        
+        try:
+            await self._run_optimization()
+            _LOGGER.info("Manual optimization completed successfully")
+        except Exception as e:
+            error_msg = f"Error in manual optimization: {str(e)}"
+            self._log_event("ERROR", error_msg)
+            _LOGGER.error(error_msg)
+            raise
+    
     async def _optimization_loop(self):
         """Main optimization loop that runs every 15 minutes."""
         while self.is_running:
@@ -400,4 +415,12 @@ class GeneticLoadOptimizer:
         if level:
             logs = [log for log in logs if log['level'] == level.upper()]
         
-        return logs[-limit:] if limit > 0 else logs 
+        return logs[-limit:] if limit > 0 else logs
+    
+    async def get_manageable_loads(self) -> List[Dict[str, Any]]:
+        """Public method to get manageable loads."""
+        try:
+            return await self._get_manageable_loads()
+        except Exception as e:
+            self._log_event("ERROR", f"Error getting manageable loads: {str(e)}")
+            return [] 

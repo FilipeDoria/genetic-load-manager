@@ -25,20 +25,26 @@ async def async_setup_entry(
         _LOGGER.error("Optimizer not found")
         return
     
-    # Get manageable loads
-    manageable_loads = await optimizer._get_manageable_loads()
-    
-    # Create switch entities for each manageable load
-    switches = []
-    for load in manageable_loads:
-        switch = GeneticLoadSwitch(load, optimizer, config_entry)
-        switches.append(switch)
-    
-    if switches:
-        async_add_entities(switches, True)
-        _LOGGER.info("Created %d genetic load manager switches", len(switches))
-    else:
-        _LOGGER.info("No manageable loads found for switches")
+    # Get manageable loads - use a public method or get from status
+    try:
+        # Get manageable loads from the optimizer
+        manageable_loads = await optimizer.get_manageable_loads()
+        
+        # Create switch entities for each manageable load
+        switches = []
+        for load in manageable_loads:
+            switch = GeneticLoadSwitch(load, optimizer, config_entry)
+            switches.append(switch)
+        
+        if switches:
+            async_add_entities(switches, True)
+            _LOGGER.info("Created %d genetic load manager switches", len(switches))
+        else:
+            _LOGGER.info("No manageable loads found for switches")
+            
+    except Exception as e:
+        _LOGGER.error("Error setting up switches: %s", str(e))
+        return
 
 class GeneticLoadSwitch(SwitchEntity):
     """Switch entity for controlling manageable loads."""

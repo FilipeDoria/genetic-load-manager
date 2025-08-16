@@ -3,30 +3,46 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-
+from .genetic_algorithm import GeneticLoadOptimizer
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "binary_sensor", "switch"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Genetic Load Manager from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
     
-    # For now, create a simple mock optimizer to test basic functionality
-    mock_optimizer = MockOptimizer()
-    hass.data[DOMAIN]['optimizer'] = mock_optimizer
+    # Create the genetic algorithm optimizer
+    try:
+        optimizer = GeneticLoadOptimizer(hass, entry.data)
+        hass.data[DOMAIN]['optimizer'] = optimizer
+        await optimizer.start()
+        _LOGGER.info("Genetic Load Manager optimizer started successfully")
+    except Exception as e:
+        _LOGGER.error(f"Failed to start optimizer: {e}")
+        return False
     
-    # Forward the setup to the platforms using the correct API
+    # Forward the setup to the platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
+    # Register services
+    await async_register_services(hass)
     
     _LOGGER.info("Genetic Load Manager integration setup completed successfully")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    # Stop the optimizer
+    if 'optimizer' in hass.data[DOMAIN]:
+        try:
+            await hass.data[DOMAIN]['optimizer'].stop()
+        except Exception as e:
+            _LOGGER.error(f"Error stopping optimizer: {e}")
+    
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     
     if unload_ok:
@@ -35,39 +51,44 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Genetic Load Manager integration unloaded successfully")
     return unload_ok
 
-class MockOptimizer:
-    """Mock optimizer for testing basic functionality."""
+async def async_register_services(hass: HomeAssistant):
+    """Register custom services."""
     
-    def __init__(self):
-        """Initialize mock optimizer."""
-        self.is_running = True
-        self.current_generation = 25
-        self.best_fitness = 750.0
-        self.optimization_count = 5
-        self.last_optimization = "2024-01-01T12:00:00"
-        self.next_optimization = "2024-01-01T12:15:00"
-        self.manageable_loads_count = 3
-        self.log_entries_count = 15
-    
-    def get_status(self):
-        """Get mock status."""
-        return {
-            'is_running': self.is_running,
-            'current_generation': self.current_generation,
-            'best_fitness': self.best_fitness,
-            'optimization_count': self.optimization_count,
-            'last_optimization': self.last_optimization,
-            'next_optimization': self.next_optimization,
-            'manageable_loads_count': self.manageable_loads_count,
-            'log_entries_count': self.log_entries_count
-        }
-    
-    def get_logs(self, level=None, limit=10):
-        """Get mock logs."""
-        return [
-            {
-                'timestamp': '2024-01-01 12:00:00',
-                'level': 'INFO',
-                'message': 'Mock optimization completed'
-            }
-        ] 
+    async def handle_run_optimization(call):
+        """Handle run_optimization service call."""
+        try:
+            optimizer = hass.data[DOMAIN].get('optimizer')
+            if optimizer:
+                # Update parameters if provided
+                if 'population_size' in call.data:
+                    optimizer.population_size = call.data['population_size']
+                if 'generations' in call.data:
+                    optimizer.generations = call.data['generations']
+                if 'mutation_rate' in call.data:
+                    optimizer.mutation_rate = call.data['mutation_rate']
+                if 'crossover_rate' in call.data:
+                    optimizer.crossover_rate = call.data['crossover_rate']
+                
+                # Run optimization
+                await optimizer.run_optimization()
+                _LOGGER.info("Manual optimization triggered successfully")
+            else:
+                _LOGGER.error("Optimizer not available")
+        except Exception as e:
+            _LOGGER.error(f"Error in manual optimization: {e}")
+
+    async def handle_stop_optimization(call):
+        """Handle stop_optimization service call."""
+        try:
+            optimizer = hass.data[DOMAIN].get('optimizer')
+            if optimizer:
+                await optimizer.stop()
+                _LOGGER.info("Optimization stopped successfully")
+            else:
+                _LOGGER.error("Optimizer not available")
+        except Exception as e:
+            _LOGGER.error(f"Error stopping optimization: {e}")
+
+    # Register the services
+    hass.services.async_register(DOMAIN, "run_optimization", handle_run_optimization)
+    hass.services.async_register(DOMAIN, "stop_optimization", handle_stop_optimization)

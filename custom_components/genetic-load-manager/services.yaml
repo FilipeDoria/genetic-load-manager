@@ -1,5 +1,23 @@
 # Services for Genetic Load Manager
 
+run_optimization:
+  description: Triggers the genetic algorithm to optimize the load schedule.
+  fields:
+    population_size:
+      description: Number of individuals in the population.
+      example: 100
+    generations:
+      description: Number of generations to run.
+      example: 200
+    mutation_rate:
+      description: Probability of mutation.
+      example: 0.05
+    crossover_rate:
+      description: Probability of crossover.
+      example: 0.8
+stop_optimization:
+  description: Stops the periodic optimization process.
+  
 optimize_loads:
   name: "Optimize Loads"
   description: "Trigger manual load optimization using genetic algorithm"

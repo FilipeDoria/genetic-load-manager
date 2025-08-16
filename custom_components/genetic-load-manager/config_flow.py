@@ -37,5 +37,9 @@ class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_FORECAST_ENTITY_ID): str,
                 vol.Required(CONF_BATTERY_SOC_ENTITY_ID): str,
                 vol.Required(CONF_PRICE_ENTITY_ID): str,
+                vol.Optional("population_size", default=50): int,
+                vol.Optional("generations", default=100): int,
+                vol.Optional("mutation_rate", default=0.1): float,
+                vol.Optional("crossover_rate", default=0.8): float,
             }),
-        ) 
+        )
