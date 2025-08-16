@@ -23,11 +23,13 @@ class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Handle the initial step."""
         if user_input is not None:
+            # Create the config entry
             return self.async_create_entry(
                 title="Genetic Load Manager",
                 data=user_input
             )
 
+        # Show the configuration form
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({

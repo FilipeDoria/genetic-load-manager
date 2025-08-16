@@ -1,5 +1,5 @@
 {
-  "domain": "genetic_load_manager",
+  "domain": "genetic-load-manager",
   "name": "Genetic Load Manager",
   "documentation": "https://github.com/filipe0doria/genetic-load-manager",
   "dependencies": [],

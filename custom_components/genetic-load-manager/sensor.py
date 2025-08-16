@@ -30,8 +30,17 @@ class GeneticLoadManagerSensor(SensorEntity):
         self._attr_name = "Genetic Load Manager Status"
         self._attr_unique_id = f"{config_entry.entry_id}_status"
         self._attr_icon = "mdi:lightning-bolt"
+        self._attr_should_poll = False
     
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        return "Active" 
+        return "Active"
+    
+    @property
+    def extra_state_attributes(self):
+        """Return entity specific state attributes."""
+        return {
+            "integration": "Genetic Load Manager",
+            "status": "Active"
+        } 
