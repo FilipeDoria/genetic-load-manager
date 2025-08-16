@@ -1,0 +1,75 @@
+# GitHub Labels Configuration
+# https://github.com/actions/labeler
+
+labels:
+  - name: "bug"
+    color: "d73a4a"
+    description: "Something isn't working"
+  
+  - name: "enhancement"
+    color: "a2eeef"
+    description: "New feature or request"
+  
+  - name: "documentation"
+    color: "0075ca"
+    description: "Improvements or additions to documentation"
+  
+  - name: "good first issue"
+    color: "7057ff"
+    description: "Good for newcomers"
+  
+  - name: "help wanted"
+    color: "008672"
+    description: "Extra attention is needed"
+  
+  - name: "priority: high"
+    color: "ff0000"
+    description: "High priority issue"
+  
+  - name: "priority: medium"
+    color: "ffa500"
+    description: "Medium priority issue"
+  
+  - name: "priority: low"
+    color: "00ff00"
+    description: "Low priority issue"
+  
+  - name: "python"
+    color: "3776ab"
+    description: "Python related changes"
+  
+  - name: "docker"
+    color: "2496ed"
+    description: "Docker related changes"
+  
+  - name: "home-assistant"
+    color: "41bdf5"
+    description: "Home Assistant integration"
+  
+  - name: "genetic-algorithm"
+    color: "6f42c1"
+    description: "Genetic algorithm related"
+  
+  - name: "ui/ux"
+    color: "f9d0c4"
+    description: "User interface or experience"
+  
+  - name: "testing"
+    color: "c2e0c6"
+    description: "Testing related"
+  
+  - name: "dependencies"
+    color: "0366d6"
+    description: "Dependency updates"
+  
+  - name: "security"
+    color: "ff6b6b"
+    description: "Security related"
+  
+  - name: "performance"
+    color: "ffd33d"
+    description: "Performance improvements"
+  
+  - name: "research"
+    color: "8b5cf6"
+    description: "Research related features" 

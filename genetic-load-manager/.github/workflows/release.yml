@@ -1,0 +1,53 @@
+name: Release Add-on
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Docker images
+      run: |
+        docker build -f Dockerfile.python313 -t genetic-load-manager:latest .
+        docker build -f Dockerfile.pure-python -t genetic-load-manager:pure-python .
+    
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          ## What's New
+          
+          ### Features
+          - Genetic algorithm load optimization
+          - Web interface for configuration
+          - Real-time monitoring
+          - Background service operation
+          
+          ### Technical
+          - Python 3.13+ compatibility
+          - Pure Python implementation
+          - Multiple Dockerfile options
+          - Home Assistant integration
+          
+          ## Installation
+          
+          1. Add repository: `https://github.com/filipe0doria/genetic-load-manager`
+          2. Install "GA Load Manager HA Add-on"
+          3. Configure entities and start
+          
+          ## Docker Images
+          
+          - `Dockerfile.python313` - Python 3.13+ (recommended)
+          - `Dockerfile.pure-python` - Pure Python alternative
+        draft: false
+        prerelease: false 

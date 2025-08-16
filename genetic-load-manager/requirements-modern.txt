@@ -1,0 +1,24 @@
+# Modern requirements for Python 3.11+ with proper setuptools handling
+setuptools>=65.5.1
+wheel>=0.38.4
+
+# Web framework
+Flask==2.3.3
+
+# HTTP requests
+requests==2.31.0
+
+# Note: Scientific computing packages removed for Python 3.13 compatibility
+# Pure Python alternatives are implemented in the application
+
+# Task scheduling
+APScheduler==3.10.4
+
+# Genetic algorithms
+deap==1.4.1
+
+# Environment variables
+python-dotenv==1.0.0
+
+# WSGI server
+gunicorn==21.2.0 

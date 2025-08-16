@@ -1,0 +1,52 @@
+# Labeler Configuration
+# https://github.com/actions/labeler
+
+# Python related files
+python:
+  - '**/*.py'
+  - '**/requirements*.txt'
+  - '**/Dockerfile*'
+  - '**/docker-compose*.yml'
+
+# Docker related files
+docker:
+  - '**/Dockerfile*'
+  - '**/docker-compose*.yml'
+  - '**/.dockerignore'
+
+# Home Assistant related
+home-assistant:
+  - '**/config.yaml'
+  - '**/build.yaml'
+  - '**/run'
+
+# Documentation
+documentation:
+  - '**/*.md'
+  - '**/*.rst'
+  - '**/docs/**'
+
+# Testing
+testing:
+  - '**/test_*.py'
+  - '**/*_test.py'
+  - '**/tests/**'
+
+# Configuration
+configuration:
+  - '**/*.yaml'
+  - '**/*.yml'
+  - '**/*.json'
+  - '**/*.toml'
+
+# GitHub specific
+github:
+  - '.github/**'
+  - '**/.github/**'
+
+# Research related
+research:
+  - '**/genetic_algorithm/**'
+  - '**/optimization/**'
+  - '**/README.md'
+  - '**/CHANGELOG.md' 
