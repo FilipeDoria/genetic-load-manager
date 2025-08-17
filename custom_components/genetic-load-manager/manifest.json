@@ -1,7 +1,7 @@
 {
   "domain": "genetic_load_manager",
   "name": "Genetic Load Manager",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "documentation": "https://github.com/filipe0doria/genetic-load-manager",
   "issue_tracker": "https://github.com/filipe0doria/genetic-load-manager/issues",
   "dependencies": ["sensor", "binary_sensor", "switch", "recorder"],
