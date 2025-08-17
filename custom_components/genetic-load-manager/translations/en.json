@@ -6,7 +6,8 @@
         "description": "Configure the genetic algorithm load optimization system with Solcast integration",
         "data": {
           "preset": "Optimization Strategy",
-          "pv_forecast_entity": "Solcast PV Forecast Entity",
+          "pv_forecast_entity": "Solcast PV Forecast for Today",
+          "pv_forecast_tomorrow_entity": "Solcast PV Forecast for Tomorrow",
           "load_forecast_entity": "Load Forecast Entity",
           "battery_soc_entity": "Battery State of Charge Entity",
           "dynamic_pricing_entity": "Dynamic Pricing Entity",

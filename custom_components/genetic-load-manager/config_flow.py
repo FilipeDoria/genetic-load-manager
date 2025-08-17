@@ -5,6 +5,15 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
+from homeassistant.const import (
+    CONF_NAME,
+    ATTR_DEVICE_CLASS,
+    ATTR_UNIT_OF_MEASUREMENT,
+    ENERGY_KILO_WATT_HOUR,
+    PERCENTAGE,
+    CURRENCY_EURO,
+    CURRENCY_DOLLAR
+)
 
 from .const import (
     DOMAIN,
@@ -60,6 +69,100 @@ PRESETS = {
     }
 }
 
+# Helper function to create entity selector with multiple filter options
+def create_entity_selector(domain="sensor", device_class=None, integration=None, unit=None, multiple=False):
+    """Create an entity selector with comprehensive filtering."""
+    config = selector.EntitySelectorConfig(domain=domain, multiple=multiple)
+    
+    if device_class:
+        config.device_class = device_class
+    
+    if integration:
+        config.integration = integration
+    
+    if unit:
+        config.unit_of_measurement = unit
+    
+    return selector.EntitySelector(config)
+
+CONFIG_SCHEMA = vol.Schema({
+    vol.Required("preset", description="Select optimization strategy"): vol.In(list(PRESETS.keys())),
+    
+    # Solar PV Forecast Entities
+    vol.Required("pv_forecast_entity", description="Select Solcast PV Forecast for Today"): create_entity_selector(
+        domain="sensor",
+        device_class="energy",
+        integration="solcast_pv_forecast"
+    ),
+    vol.Required("pv_forecast_tomorrow_entity", description="Select Solcast PV Forecast for Tomorrow"): create_entity_selector(
+        domain="sensor",
+        device_class="energy",
+        integration="solcast_pv_forecast"
+    ),
+    
+    # Load Forecasting
+    vol.Required("load_forecast_entity", default="sensor.load_forecast", description="Load Forecast Entity (will be created)"): str,
+    vol.Required("load_sensor_entity", description="Select Energy Consumption Sensor for Historical Data"): create_entity_selector(
+        domain="sensor",
+        device_class="energy",
+        unit=ENERGY_KILO_WATT_HOUR
+    ),
+    
+    # Battery Management
+    vol.Required("battery_soc_entity", description="Select Battery State of Charge Sensor"): create_entity_selector(
+        domain="sensor",
+        device_class="battery",
+        unit=PERCENTAGE
+    ),
+    
+    # Pricing Information
+    vol.Required("dynamic_pricing_entity", description="Select Electricity Price Sensor"): create_entity_selector(
+        domain="sensor",
+        device_class="monetary"
+    ),
+    
+    # Device Configuration
+    vol.Optional("num_devices", default=2, description="Number of manageable devices (1-10)"): vol.All(
+        vol.Coerce(int),
+        vol.Range(min=1, max=10)
+    ),
+    
+    # Genetic Algorithm Parameters
+    vol.Optional("population_size", description="Genetic algorithm population size (50-500)"): vol.All(
+        vol.Coerce(int),
+        vol.Range(min=50, max=500)
+    ),
+    vol.Optional("generations", description="Number of generations to run (100-1000)"): vol.All(
+        vol.Coerce(int),
+        vol.Range(min=100, max=1000)
+    ),
+    vol.Optional("mutation_rate", description="Mutation rate (0.01-0.20)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.01, max=0.20)
+    ),
+    vol.Optional("crossover_rate", description="Crossover rate (0.5-0.95)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.5, max=0.95)
+    ),
+    
+    # Battery Parameters
+    vol.Optional("battery_capacity", description="Battery capacity in kWh (1.0-50.0)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=1.0, max=50.0)
+    ),
+    vol.Optional("max_charge_rate", description="Maximum battery charge rate in kW (0.5-10.0)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.5, max=10.0)
+    ),
+    vol.Optional("max_discharge_rate", description="Maximum battery discharge rate in kW (0.5-10.0)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.5, max=10.0)
+    ),
+    
+    # Control Options
+    vol.Optional("binary_control", default=False, description="Use binary (on/off) control instead of continuous"): bool,
+})
+
 class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Genetic Load Manager."""
 
@@ -77,6 +180,15 @@ class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input.update(preset_config)
                 _LOGGER.info("Applied preset configuration: %s", preset)
             
+            # Validate entity selections
+            errors = await self._validate_entities(user_input)
+            if errors:
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=CONFIG_SCHEMA,
+                    errors=errors
+                )
+            
             # Create the config entry
             return self.async_create_entry(
                 title="Genetic Load Manager",
@@ -86,22 +198,46 @@ class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Show the configuration form
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({
-                vol.Required("preset", description="Select optimization strategy"): vol.In(list(PRESETS.keys())),
-                vol.Required("pv_forecast_entity", description="Select Solcast PV Forecast Entity"): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor", integration="solcast_pv_forecast")
-                ),
-                vol.Required("load_forecast_entity"): str,
-                vol.Required("battery_soc_entity"): str,
-                vol.Required("dynamic_pricing_entity"): str,
-                vol.Optional("num_devices", default=2): int,
-                vol.Optional("population_size"): int,
-                vol.Optional("generations"): int,
-                vol.Optional("mutation_rate"): float,
-                vol.Optional("crossover_rate"): float,
-                vol.Optional("battery_capacity"): float,
-                vol.Optional("max_charge_rate"): float,
-                vol.Optional("max_discharge_rate"): float,
-                vol.Optional("binary_control", default=False): bool,
-            }),
+            data_schema=CONFIG_SCHEMA,
         )
+
+    async def _validate_entities(self, user_input):
+        """Validate that selected entities are appropriate for their purpose."""
+        errors = {}
+        
+        # Validate PV forecast entities
+        pv_entity = user_input.get("pv_forecast_entity")
+        pv_tomorrow_entity = user_input.get("pv_forecast_tomorrow_entity")
+        
+        if pv_entity and pv_tomorrow_entity and pv_entity == pv_tomorrow_entity:
+            errors["base"] = "Today and tomorrow PV forecast entities must be different"
+        
+        # Validate load sensor entity
+        load_sensor = user_input.get("load_sensor_entity")
+        if load_sensor:
+            # Check if entity exists and has energy device class
+            state = self.hass.states.get(load_sensor)
+            if not state:
+                errors["load_sensor_entity"] = "Selected load sensor entity does not exist"
+            elif state.attributes.get(ATTR_DEVICE_CLASS) != "energy":
+                errors["load_sensor_entity"] = "Selected entity should have device class 'energy'"
+        
+        # Validate battery SOC entity
+        battery_entity = user_input.get("battery_soc_entity")
+        if battery_entity:
+            state = self.hass.states.get(battery_entity)
+            if not state:
+                errors["battery_soc_entity"] = "Selected battery SOC entity does not exist"
+            elif state.attributes.get(ATTR_DEVICE_CLASS) != "battery":
+                errors["battery_soc_entity"] = "Selected entity should have device class 'battery'"
+        
+        # Validate pricing entity
+        pricing_entity = user_input.get("dynamic_pricing_entity")
+        if pricing_entity:
+            state = self.hass.states.get(pricing_entity)
+            if not state:
+                errors["dynamic_pricing_entity"] = "Selected pricing entity does not exist"
+            elif state.attributes.get(ATTR_DEVICE_CLASS) != "monetary":
+                errors["dynamic_pricing_entity"] = "Selected entity should have device class 'monetary'"
+        
+        return errors

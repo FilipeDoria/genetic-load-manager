@@ -26,7 +26,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
     
-    # Create the genetic algorithm optimizer
     try:
         genetic_algo = GeneticLoadOptimizer(hass, entry.data)
         hass.data[DOMAIN]['genetic_algorithm'] = genetic_algo
@@ -36,28 +35,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error(f"Failed to start optimizer: {e}")
         return False
     
-    # Forward the setup to the platforms
+    # Forward the setup to all platforms including sensor
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    
-    # Register services
     await async_register_services(hass)
-    
-    # Start periodic optimization
-    await genetic_algo.schedule_optimization()
+    await genetic_algo.schedule_optimization() # Start periodic optimization
     
     _LOGGER.info("Genetic Load Manager integration setup completed successfully")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Stop the optimizer
     if 'genetic_algorithm' in hass.data[DOMAIN]:
         try:
             await hass.data[DOMAIN]['genetic_algorithm'].stop()
         except Exception as e:
             _LOGGER.error(f"Error stopping optimizer: {e}")
     
-    # Remove tracker if active
     if "async_remove_tracker" in hass.data[DOMAIN]:
         hass.data[DOMAIN]["async_remove_tracker"]()
         del hass.data[DOMAIN]["async_remove_tracker"]
@@ -73,12 +66,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_register_services(hass: HomeAssistant):
     """Register custom services."""
     
+    @callback
     async def handle_run_optimization(call):
         """Handle run_optimization service call."""
         try:
             genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
             if genetic_algo:
-                # Update parameters if provided
                 if 'population_size' in call.data:
                     genetic_algo.population_size = call.data['population_size']
                 if 'generations' in call.data:
@@ -88,10 +81,8 @@ async def async_register_services(hass: HomeAssistant):
                 if 'crossover_rate' in call.data:
                     genetic_algo.crossover_rate = call.data['crossover_rate']
                 
-                # Run optimization
                 await genetic_algo.run_optimization()
                 
-                # Update status sensor
                 await hass.states.async_set(
                     "sensor.genetic_algorithm_status",
                     "completed",
@@ -107,6 +98,7 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error in manual optimization: {e}")
 
+    @callback
     async def handle_start_optimization(call):
         """Handle start_optimization service call."""
         try:
@@ -127,6 +119,7 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error starting optimization: {e}")
 
+    @callback
     async def handle_stop_optimization(call):
         """Handle stop_optimization service call."""
         try:
@@ -144,6 +137,7 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error stopping optimization: {e}")
 
+    @callback
     async def handle_toggle_scheduler(call):
         """Handle toggle_scheduler service call."""
         try:
@@ -199,7 +193,6 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error toggling scheduler: {e}")
 
-    # Register the services
     hass.services.async_register(DOMAIN, "run_optimization", handle_run_optimization)
     hass.services.async_register(DOMAIN, "start_optimization", handle_start_optimization)
     hass.services.async_register(DOMAIN, "stop_optimization", handle_stop_optimization)

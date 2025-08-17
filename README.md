@@ -1,4 +1,4 @@
-# 🧬 **Genetic Load Manager - Advanced HACS Integration - version: 1.3.1**
+# 🧬 **Genetic Load Manager - Advanced HACS Integration - version: 1.3.2**
 
 A sophisticated Home Assistant integration for **intelligent load management** using **genetic algorithms** to optimize energy consumption, reduce costs, and maximize solar power utilization.
 
