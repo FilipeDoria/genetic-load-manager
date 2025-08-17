@@ -1,7 +1,7 @@
 # Services for Genetic Load Manager
 
 run_optimization:
-  description: Triggers the genetic algorithm to optimize the load schedule.
+  description: Triggers the genetic algorithm to optimize the load schedule immediately.
   fields:
     population_size:
       description: Number of individuals in the population.
@@ -15,9 +15,24 @@ run_optimization:
     crossover_rate:
       description: Probability of crossover.
       example: 0.8
+
+start_optimization:
+  description: Starts the periodic optimization process (every 15 minutes).
+
 stop_optimization:
   description: Stops the periodic optimization process.
-  
+
+toggle_scheduler:
+  description: Switches between genetic algorithm and rule-based scheduling.
+  fields:
+    mode:
+      description: Scheduler mode to use.
+      example: "genetic"
+      selector:
+        select:
+          options: ["genetic", "rule-based"]
+          default: "genetic"
+
 optimize_loads:
   name: "Optimize Loads"
   description: "Trigger manual load optimization using genetic algorithm"
@@ -195,28 +210,6 @@ set_optimization_parameters:
           max: 1.0
           default: 0.8
           step: 0.1
-
-start_optimization:
-  name: "Start Optimization"
-  description: "Start the genetic algorithm optimization service"
-  fields:
-    auto_start:
-      name: "Auto Start"
-      description: "Automatically start optimization loop"
-      selector:
-        boolean:
-          default: true
-
-stop_optimization:
-  name: "Stop Optimization"
-  description: "Stop the genetic algorithm optimization service"
-  fields:
-    confirm:
-      name: "Confirm Stop"
-      description: "Confirm that you want to stop optimization"
-      selector:
-        boolean:
-          default: false
 
 export_schedule:
   name: "Export Schedule"

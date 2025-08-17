@@ -3,14 +3,30 @@
     "step": {
       "user": {
         "title": "Genetic Load Manager Configuration",
-        "description": "Configure the genetic algorithm load optimization system",
+        "description": "Configure the genetic algorithm load optimization system with Solcast integration",
         "data": {
-          "pv_entity_id": "PV Power Entity ID",
-          "forecast_entity_id": "Forecast Entity ID",
-          "battery_soc_entity_id": "Battery SOC Entity ID",
-          "price_entity_id": "Electricity Price Entity ID"
+          "preset": "Optimization Strategy",
+          "pv_forecast_entity": "Solcast PV Forecast Entity",
+          "load_forecast_entity": "Load Forecast Entity",
+          "battery_soc_entity": "Battery State of Charge Entity",
+          "dynamic_pricing_entity": "Dynamic Pricing Entity",
+          "num_devices": "Number of Manageable Devices",
+          "population_size": "Population Size (overrides preset)",
+          "generations": "Number of Generations (overrides preset)",
+          "mutation_rate": "Mutation Rate (overrides preset)",
+          "crossover_rate": "Crossover Rate (overrides preset)",
+          "battery_capacity": "Battery Capacity in kWh (overrides preset)",
+          "max_charge_rate": "Maximum Charge Rate in kW (overrides preset)",
+          "max_discharge_rate": "Maximum Discharge Rate in kW (overrides preset)",
+          "binary_control": "Binary Control Mode"
         }
       }
+    },
+    "preset": {
+      "balanced": "Balanced - Optimizes cost, solar usage, and battery life",
+      "cost-focused": "Cost-Focused - Prioritizes cost savings with aggressive battery usage",
+      "battery-preserving": "Battery-Preserving - Conservative approach to maximize battery lifespan",
+      "solar-optimized": "Solar-Optimized - Maximizes solar energy utilization"
     }
   }
 } 
