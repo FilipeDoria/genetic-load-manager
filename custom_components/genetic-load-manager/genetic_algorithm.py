@@ -99,17 +99,21 @@ class GeneticLoadOptimizer:
                 if entity_id in [
                     self.pv_forecast_entity, 
                     self.pv_forecast_tomorrow_entity,
-                    self.load_forecast_entity, 
-                    self.battery_soc_entity, 
+                    self.load_forecast_entity,
+                    self.battery_soc_entity,
                     self.dynamic_pricing_entity
                 ]:
-                    _LOGGER.debug("State change detected for %s, scheduling forecast update", entity_id)
-                    # Schedule forecast update (non-blocking)
-                    asyncio.create_task(self._schedule_forecast_update())
+                    _LOGGER.debug("Forecast entity %s changed, scheduling update", entity_id)
+                    # Schedule forecast update
+                    asyncio.create_task(self.fetch_forecast_data())
             
-            # Register the listener
-            self._data_listener = self.hass.bus.async_listen("state_changed", handle_state_change)
-            _LOGGER.info("State change listener registered for forecast entities")
+            # Listen for state changes
+            self._data_listener = self.hass.bus.async_listen(
+                "state_changed", 
+                handle_state_change
+            )
+            
+            _LOGGER.info("State change listener setup completed")
             
         except Exception as e:
             _LOGGER.error("Error setting up state change listener: %s", str(e))
@@ -461,7 +465,8 @@ class GeneticLoadOptimizer:
         await periodic_optimization(datetime.now())
         
         # Schedule periodic execution every 15 minutes
-        async_remove_tracker = self.hass.helpers.event.async_track_time_interval(
+        async_remove_tracker = async_track_time_interval(
+            self.hass,
             periodic_optimization, 
             timedelta(minutes=15)
         )
@@ -492,7 +497,8 @@ class GeneticLoadOptimizer:
             loads = []
             
             # Look for switch entities that might be manageable loads
-            for entity_id, entity_state in self.hass.states.async_all():
+            all_states = self.hass.states.async_all()
+            for entity_id, entity_state in all_states:
                 if entity_state.domain == 'switch':
                     loads.append({
                         'entity_id': entity_id,

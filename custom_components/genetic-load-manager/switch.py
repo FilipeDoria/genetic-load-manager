@@ -1,7 +1,6 @@
-"""Switch platform for Genetic Load Manager."""
+"""Switch platform for Genetic Load Manager integration."""
 import logging
 from typing import Any, Dict, Optional
-
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -12,28 +11,24 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
     """Set up the Genetic Load Manager switch platform."""
     
-    # Get the optimizer instance
-    optimizer = hass.data[DOMAIN].get('optimizer')
-    if not optimizer:
-        _LOGGER.error("Optimizer not found")
+    # Get the genetic algorithm instance
+    genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
+    if not genetic_algo:
+        _LOGGER.error("Genetic algorithm not found")
         return
     
     # Get manageable loads - use a public method or get from status
     try:
-        # Get manageable loads from the optimizer
-        manageable_loads = await optimizer.get_manageable_loads()
+        # Get manageable loads from the genetic algorithm
+        manageable_loads = await genetic_algo.get_manageable_loads()
         
         # Create switch entities for each manageable load
         switches = []
         for load in manageable_loads:
-            switch = GeneticLoadSwitch(load, optimizer, config_entry)
+            switch = GeneticLoadSwitch(load, genetic_algo, entry)
             switches.append(switch)
         
         if switches:
@@ -49,10 +44,10 @@ async def async_setup_entry(
 class GeneticLoadSwitch(SwitchEntity):
     """Switch entity for controlling manageable loads."""
     
-    def __init__(self, load_info: Dict[str, Any], optimizer, config_entry: ConfigEntry):
+    def __init__(self, load_info: Dict[str, Any], genetic_algo, config_entry: ConfigEntry):
         """Initialize the switch."""
         self.load_info = load_info
-        self.optimizer = optimizer
+        self.genetic_algo = genetic_algo
         self.config_entry = config_entry
         
         # Set entity properties
@@ -83,7 +78,7 @@ class GeneticLoadSwitch(SwitchEntity):
             "priority_level": self.priority,
             "flexible": self.flexible,
             "managed_by": "Genetic Load Manager",
-            "optimization_enabled": self.optimizer.is_running
+            "optimization_enabled": self.genetic_algo.is_running
         }
     
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -99,16 +94,10 @@ class GeneticLoadSwitch(SwitchEntity):
             self._attr_is_on = True
             
             # Log the action
-            self.optimizer._log_event(
-                "INFO", 
-                f"Load {self.entity_id} turned ON manually"
-            )
-            
             _LOGGER.info("Turned ON load: %s", self.entity_id)
             
         except Exception as e:
             error_msg = f"Error turning ON load {self.entity_id}: {str(e)}"
-            self.optimizer._log_event("ERROR", error_msg)
             _LOGGER.error(error_msg)
             raise
     
@@ -125,27 +114,21 @@ class GeneticLoadSwitch(SwitchEntity):
             self._attr_is_on = False
             
             # Log the action
-            self.optimizer._log_event(
-                "INFO", 
-                f"Load {self.entity_id} turned OFF manually"
-            )
-            
             _LOGGER.info("Turned OFF load: %s", self.entity_id)
             
         except Exception as e:
             error_msg = f"Error turning OFF load {self.entity_id}: {str(e)}"
-            self.optimizer._log_event("ERROR", error_msg)
             _LOGGER.error(error_msg)
             raise
     
     async def async_update(self) -> None:
         """Update the switch state."""
         try:
-            # Get current state from Home Assistant
-            entity_state = self.hass.states.get(self.entity_id)
-            if entity_state:
-                self._attr_is_on = entity_state.state == 'on'
-                self._attr_available = entity_state.state != 'unavailable'
+            # Get current state from the actual load
+            load_state = self.hass.states.get(self.entity_id)
+            if load_state:
+                self._attr_is_on = load_state.state == "on"
+                self._attr_available = True
             else:
                 self._attr_available = False
                 
@@ -158,7 +141,7 @@ class GeneticLoadSwitch(SwitchEntity):
         await super().async_added_to_hass()
         
         # Log that this switch is now available
-        self.optimizer._log_event(
+        self.genetic_algo._log_event(
             "INFO", 
             f"Load switch {self.entity_id} added to Home Assistant"
         )
@@ -168,7 +151,7 @@ class GeneticLoadSwitch(SwitchEntity):
         await super().async_will_remove_from_hass()
         
         # Log that this switch is being removed
-        self.optimizer._log_event(
+        self.genetic_algo._log_event(
             "INFO", 
             f"Load switch {self.entity_id} removed from Home Assistant"
         ) 

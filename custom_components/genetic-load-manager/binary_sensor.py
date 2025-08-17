@@ -1,35 +1,31 @@
-"""Binary Sensor platform for Genetic Load Manager."""
+"""Binary sensor platform for Genetic Load Manager integration."""
 import logging
 from typing import Any, Dict, Optional
-
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
     """Set up the Genetic Load Manager binary sensor platform."""
     
-    # Get the optimizer instance
-    optimizer = hass.data[DOMAIN].get('optimizer')
-    if not optimizer:
-        _LOGGER.error("Optimizer not found")
+    # Get the genetic algorithm instance
+    genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
+    if not genetic_algo:
+        _LOGGER.error("Genetic algorithm not found")
         return
     
     # Create binary sensors
     binary_sensors = [
-        OptimizationRunningSensor(optimizer, config_entry),
-        SystemHealthySensor(optimizer, config_entry),
-        LoadsControlledSensor(optimizer, config_entry),
-        AlgorithmErrorSensor(optimizer, config_entry)
+        OptimizationRunningSensor(genetic_algo, entry),
+        SystemHealthySensor(genetic_algo, entry),
+        LoadsControlledSensor(genetic_algo, entry),
+        AlgorithmErrorSensor(genetic_algo, entry)
     ]
     
     async_add_entities(binary_sensors, True)
@@ -38,9 +34,9 @@ async def async_setup_entry(
 class GeneticLoadManagerBinarySensor(BinarySensorEntity):
     """Base class for Genetic Load Manager binary sensors."""
     
-    def __init__(self, optimizer, config_entry: ConfigEntry):
+    def __init__(self, genetic_algo, config_entry: ConfigEntry):
         """Initialize the binary sensor."""
-        self.optimizer = optimizer
+        self.genetic_algo = genetic_algo
         self.config_entry = config_entry
         self._attr_should_poll = True
         self._attr_available = True
@@ -48,9 +44,9 @@ class GeneticLoadManagerBinarySensor(BinarySensorEntity):
 class OptimizationRunningSensor(GeneticLoadManagerBinarySensor):
     """Binary sensor for optimization running status."""
     
-    def __init__(self, optimizer, config_entry: ConfigEntry):
+    def __init__(self, genetic_algo, config_entry: ConfigEntry):
         """Initialize the sensor."""
-        super().__init__(optimizer, config_entry)
+        super().__init__(genetic_algo, config_entry)
         self._attr_name = "Genetic Load Manager Optimization Running"
         self._attr_unique_id = f"{config_entry.entry_id}_optimization_running"
         self._attr_icon = "mdi:play-circle"
@@ -59,25 +55,24 @@ class OptimizationRunningSensor(GeneticLoadManagerBinarySensor):
     @property
     def is_on(self) -> Optional[bool]:
         """Return true if optimization is running."""
-        status = self.optimizer.get_status()
-        return status.get('is_running', False)
+        return self.genetic_algo.is_running
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return entity specific state attributes."""
-        status = self.optimizer.get_status()
         return {
-            "current_generation": status.get('current_generation', 0),
-            "best_fitness": status.get('best_fitness', 0.0),
-            "optimization_count": status.get('optimization_count', 0)
+            "is_running": self.genetic_algo.is_running,
+            "population_size": getattr(self.genetic_algo, 'population_size', 0),
+            "generations": getattr(self.genetic_algo, 'generations', 0),
+            "num_devices": getattr(self.genetic_algo, 'num_devices', 0)
         }
 
 class SystemHealthySensor(GeneticLoadManagerBinarySensor):
     """Binary sensor for system health status."""
     
-    def __init__(self, optimizer, config_entry: ConfigEntry):
+    def __init__(self, genetic_algo, config_entry: ConfigEntry):
         """Initialize the sensor."""
-        super().__init__(optimizer, config_entry)
+        super().__init__(genetic_algo, config_entry)
         self._attr_name = "Genetic Load Manager System Healthy"
         self._attr_unique_id = f"{config_entry.entry_id}_system_healthy"
         self._attr_icon = "mdi:heart-pulse"
@@ -87,20 +82,15 @@ class SystemHealthySensor(GeneticLoadManagerBinarySensor):
     def is_on(self) -> Optional[bool]:
         """Return true if system is healthy."""
         try:
-            # Check if optimizer is running and has recent activity
-            status = self.optimizer.get_status()
-            
-            if not status.get('is_running', False):
+            # Check if genetic algorithm is running
+            if not self.genetic_algo.is_running:
                 return False
             
-            # Check if there are any recent errors
-            recent_logs = self.optimizer.get_logs(level='ERROR', limit=10)
-            if recent_logs:
-                # If there are errors in the last 10 logs, system might be unhealthy
+            # Check if we have forecast data
+            if not hasattr(self.genetic_algo, 'pv_forecast') or self.genetic_algo.pv_forecast is None:
                 return False
             
-            # Check if optimization is progressing
-            if status.get('optimization_count', 0) == 0:
+            if not hasattr(self.genetic_algo, 'load_forecast') or self.genetic_algo.load_forecast is None:
                 return False
             
             return True
@@ -112,36 +102,36 @@ class SystemHealthySensor(GeneticLoadManagerBinarySensor):
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return entity specific state attributes."""
         try:
-            status = self.optimizer.get_status()
-            recent_errors = self.optimizer.get_logs(level='ERROR', limit=5)
-            
             return {
-                "optimization_running": status.get('is_running', False),
-                "recent_errors": len(recent_errors),
-                "last_optimization": status.get('last_optimization'),
-                "system_status": "Healthy" if self.is_on else "Unhealthy"
+                "optimization_running": self.genetic_algo.is_running,
+                "pv_forecast_available": hasattr(self.genetic_algo, 'pv_forecast') and self.genetic_algo.pv_forecast is not None,
+                "load_forecast_available": hasattr(self.genetic_algo, 'load_forecast') and self.genetic_algo.load_forecast is not None,
+                "battery_soc_available": hasattr(self.genetic_algo, 'battery_soc_entity') and self.genetic_algo.battery_soc_entity is not None
             }
         except Exception:
-            return {"system_status": "Unknown"}
+            return {"error": "Unable to get system status"}
 
 class LoadsControlledSensor(GeneticLoadManagerBinarySensor):
-    """Binary sensor for loads being controlled."""
+    """Binary sensor for loads controlled status."""
     
-    def __init__(self, optimizer, config_entry: ConfigEntry):
+    def __init__(self, genetic_algo, config_entry: ConfigEntry):
         """Initialize the sensor."""
-        super().__init__(optimizer, config_entry)
+        super().__init__(genetic_algo, config_entry)
         self._attr_name = "Genetic Load Manager Loads Controlled"
         self._attr_unique_id = f"{config_entry.entry_id}_loads_controlled"
-        self._attr_icon = "mdi:lightbulb-group"
-        self._attr_device_class = "presence"
+        self._attr_icon = "mdi:lightning-bolt"
+        self._attr_device_class = "power"
     
     @property
     def is_on(self) -> Optional[bool]:
         """Return true if loads are being controlled."""
         try:
-            status = self.optimizer.get_status()
-            manageable_loads = status.get('manageable_loads_count', 0)
-            return manageable_loads > 0
+            # Check if we have manageable loads
+            if not hasattr(self.genetic_algo, 'num_devices'):
+                return False
+            
+            return self.genetic_algo.num_devices > 0
+            
         except Exception:
             return False
     
@@ -149,22 +139,22 @@ class LoadsControlledSensor(GeneticLoadManagerBinarySensor):
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return entity specific state attributes."""
         try:
-            status = self.optimizer.get_status()
             return {
-                "manageable_loads_count": status.get('manageable_loads_count', 0),
-                "loads_available": self.is_on
+                "num_devices": getattr(self.genetic_algo, 'num_devices', 0),
+                "device_priorities": getattr(self.genetic_algo, 'device_priorities', []),
+                "battery_capacity": getattr(self.genetic_algo, 'battery_capacity', 0.0)
             }
         except Exception:
-            return {"loads_available": False}
+            return {"error": "Unable to get loads status"}
 
 class AlgorithmErrorSensor(GeneticLoadManagerBinarySensor):
-    """Binary sensor for algorithm errors."""
+    """Binary sensor for algorithm error status."""
     
-    def __init__(self, optimizer, config_entry: ConfigEntry):
+    def __init__(self, genetic_algo, config_entry: ConfigEntry):
         """Initialize the sensor."""
-        super().__init__(optimizer, config_entry)
-        self._attr_name = "Genetic Load Manager Algorithm Errors"
-        self._attr_unique_id = f"{config_entry.entry_id}_algorithm_errors"
+        super().__init__(genetic_algo, config_entry)
+        self._attr_name = "Genetic Load Manager Algorithm Error"
+        self._attr_unique_id = f"{config_entry.entry_id}_algorithm_error"
         self._attr_icon = "mdi:alert-circle"
         self._attr_device_class = "problem"
     
@@ -172,25 +162,32 @@ class AlgorithmErrorSensor(GeneticLoadManagerBinarySensor):
     def is_on(self) -> Optional[bool]:
         """Return true if there are algorithm errors."""
         try:
-            recent_errors = self.optimizer.get_logs(level='ERROR', limit=5)
-            return len(recent_errors) > 0
-        except Exception:
+            # For now, we'll consider it an error if the genetic algorithm is not running
+            # when it should be, or if critical attributes are missing
+            if not self.genetic_algo.is_running:
+                return True
+            
+            # Check for critical missing attributes
+            critical_attrs = ['pv_forecast_entity', 'load_forecast_entity', 'battery_soc_entity']
+            for attr in critical_attrs:
+                if not hasattr(self.genetic_algo, attr) or getattr(self.genetic_algo, attr) is None:
+                    return True
+            
             return False
+            
+        except Exception:
+            return True
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return entity specific state attributes."""
         try:
-            recent_errors = self.optimizer.get_logs(level='ERROR', limit=5)
-            error_summary = []
-            
-            for error in recent_errors:
-                error_summary.append(f"{error['timestamp']}: {error['message']}")
-            
             return {
-                "error_count": len(recent_errors),
-                "recent_errors": error_summary,
-                "last_error": recent_errors[-1]['timestamp'] if recent_errors else None
+                "is_running": self.genetic_algo.is_running,
+                "pv_forecast_entity": getattr(self.genetic_algo, 'pv_forecast_entity', None),
+                "load_forecast_entity": getattr(self.genetic_algo, 'load_forecast_entity', None),
+                "battery_soc_entity": getattr(self.genetic_algo, 'battery_soc_entity', None),
+                "dynamic_pricing_entity": getattr(self.genetic_algo, 'dynamic_pricing_entity', None)
             }
         except Exception:
-            return {"error_count": 0} 
+            return {"error": "Unable to get error status"} 
