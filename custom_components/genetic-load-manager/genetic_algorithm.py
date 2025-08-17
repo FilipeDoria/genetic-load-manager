@@ -196,7 +196,7 @@ class GeneticLoadOptimizer:
             
             # Look for switch entities that might be manageable loads
             for entity_id, entity_state in self.hass.states.async_all():
-                if entity_state.domain == 'switch' and 'load' in entity_id.lower():
+                if entity_state.domain == 'switch':
                     loads.append({
                         'entity_id': entity_id,
                         'name': entity_state.attributes.get('friendly_name', entity_id),
