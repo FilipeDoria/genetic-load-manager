@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 import logging
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class GeneticAlgorithm:
         self.battery_capacity = config.get("battery_capacity", 10.0)
         self.max_charge_rate = config.get("max_charge_rate", 2.0)
         self.max_discharge_rate = config.get("max_discharge_rate", 2.0)
+        self.binary_control = config.get("binary_control", False)
 
     async def fetch_forecast_data(self):
         """Fetch and process Solcast PV, load, battery, and pricing data for a 24-hour horizon."""
@@ -104,7 +106,7 @@ class GeneticAlgorithm:
         self.population = np.random.uniform(0, 1, (self.population_size, self.num_devices, self.time_slots))
         for i in range(self.population_size):
             for d in range(self.num_devices):
-                if config.get("binary_control", False):
+                if self.binary_control:
                     self.population[i, d, :] = (self.population[i, d, :] > 0.5).astype(float)
 
     async def fitness_function(self, chromosome):
@@ -151,7 +153,7 @@ class GeneticAlgorithm:
     async def mutate(self, chromosome, generation):
         adaptive_rate = self.mutation_rate * (1 - generation / self.generations)
         mutation_mask = np.random.random(chromosome.shape) < adaptive_rate
-        if config.get("binary_control", False):
+        if self.binary_control:
             chromosome[mutation_mask] = 1 - chromosome[mutation_mask]
         else:
             chromosome[mutation_mask] = np.random.uniform(0, 1)
@@ -197,3 +199,63 @@ class GeneticAlgorithm:
         async_remove_tracker = async_track_time_interval(self.hass, periodic_optimization, timedelta(minutes=15))
         self.hass.data[DOMAIN]["async_remove_tracker"] = async_remove_tracker
         return async_remove_tracker
+
+    async def get_manageable_loads(self):
+        """Get list of manageable loads for switch creation."""
+        loads = []
+        for i in range(self.num_devices):
+            load_info = {
+                'entity_id': f"switch.device_{i}",
+                'name': f"Device {i}",
+                'power_consumption': 1000,  # Default 1kW
+                'priority': self.device_priorities[i] if i < len(self.device_priorities) else 1.0,
+                'flexible': True
+            }
+            loads.append(load_info)
+        return loads
+
+    @property
+    def is_running(self):
+        """Check if the genetic algorithm is currently running."""
+        return hasattr(self, 'population') and self.population is not None
+
+    async def start(self):
+        """Start the genetic algorithm optimizer."""
+        await self.fetch_forecast_data()
+        await self.initialize_population()
+        return True
+
+    async def stop(self):
+        """Stop the genetic algorithm optimizer."""
+        # Clean up any running processes
+        if hasattr(self, 'population'):
+            self.population = None
+        return True
+
+    async def run_optimization(self):
+        """Run a single optimization cycle."""
+        return await self.optimize()
+
+    async def rule_based_schedule(self):
+        """Generate a rule-based schedule as fallback."""
+        # Simple rule-based scheduling based on PV forecast and pricing
+        schedule = np.zeros((self.num_devices, self.time_slots))
+        
+        for t in range(self.time_slots):
+            # Turn on devices when PV generation is high and prices are low
+            if self.pv_forecast[t] > 0.5 and self.pricing[t] < np.mean(self.pricing):
+                for d in range(self.num_devices):
+                    schedule[d, t] = 1.0
+        
+        return schedule
+
+    def _log_event(self, level, message):
+        """Log an event with the specified level."""
+        if level == "INFO":
+            _LOGGER.info(message)
+        elif level == "WARNING":
+            _LOGGER.warning(message)
+        elif level == "ERROR":
+            _LOGGER.error(message)
+        else:
+            _LOGGER.debug(message)
