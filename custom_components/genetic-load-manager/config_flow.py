@@ -200,7 +200,7 @@ CONFIG_SCHEMA = vol.Schema({
     ),
 })
 
-class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow):
     """Handle a config flow for Genetic Load Manager."""
 
     VERSION = 1

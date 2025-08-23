@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 from .genetic_algorithm import GeneticLoadOptimizer
 from .const import DOMAIN
+from . import config_flow
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,6 +20,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     genetic_algo = GeneticLoadOptimizer(hass, conf)
     hass.data[DOMAIN]["genetic_algorithm"] = genetic_algo
     await async_register_services(hass)
+    
+    # Register config flow handler
+    config_entries.async_register_flow_handler(
+        hass, DOMAIN, config_flow.GeneticLoadManagerConfigFlow
+    )
+    
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
