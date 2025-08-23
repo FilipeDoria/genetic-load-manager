@@ -94,12 +94,14 @@ class LoadForecastSensor(SensorEntity):
         start_time = end_time - timedelta(hours=24)
         
         try:
-            history = await get_significant_states(
+            history = await self.hass.async_add_executor_job(
+                get_significant_states,
                 self.hass,
                 start_time,
                 end_time,
                 [self._load_sensor_entity],
-                significant_changes_only=True
+                None,  # end_time_param
+                True   # significant_changes_only
             )
             return history.get(self._load_sensor_entity, [])
         except Exception as e:
