@@ -10,7 +10,7 @@ import numpy as np
 import logging
 
 _LOGGER = logging.getLogger(__name__)
-DOMAIN = "genetic_load_manager"
+from .const import DOMAIN
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigType, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
     """Set up the sensor platform for the genetic load manager."""

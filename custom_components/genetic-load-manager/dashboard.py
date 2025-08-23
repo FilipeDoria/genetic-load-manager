@@ -12,7 +12,7 @@ from homeassistant.const import PERCENTAGE
 from homeassistant.helpers.event import async_track_time_interval
 
 _LOGGER = logging.getLogger(__name__)
-DOMAIN = "genetic_load_manager"
+from .const import DOMAIN
 
 class OptimizationDashboardSensor(SensorEntity):
     """Dashboard sensor providing comprehensive optimization metrics."""
