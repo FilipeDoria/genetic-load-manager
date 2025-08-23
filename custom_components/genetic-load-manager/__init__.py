@@ -5,7 +5,7 @@ from datetime import timedelta, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
-from .genetic_algorithm import GeneticLoadOptimizer
+from .genetic_algorithm import GeneticAlgorithm
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     # Only create genetic algorithm instance if configuration is provided
     if conf:
         try:
-            genetic_algo = GeneticLoadOptimizer(hass, conf)
+            genetic_algo = GeneticAlgorithm(hass, conf)
             hass.data[DOMAIN]["genetic_algorithm"] = genetic_algo
         except Exception as e:
             _LOGGER.warning(f"Could not initialize genetic algorithm with config: {e}")
@@ -34,7 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = entry.data
     
     try:
-        genetic_algo = GeneticLoadOptimizer(hass, entry.data)
+        genetic_algo = GeneticAlgorithm(hass, entry.data)
         hass.data[DOMAIN]['genetic_algorithm'] = genetic_algo
         await genetic_algo.start()
         _LOGGER.info("Genetic Load Manager optimizer started successfully")
@@ -45,7 +45,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Forward the setup to all platforms including sensor
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await async_register_services(hass)
-    await genetic_algo.schedule_optimization() # Start periodic optimization
+    
+    # Start periodic optimization and store the tracker
+    hass.data[DOMAIN]["async_remove_tracker"] = await genetic_algo.schedule_optimization()
     
     _LOGGER.info("Genetic Load Manager integration setup completed successfully")
     return True
@@ -73,7 +75,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_register_services(hass: HomeAssistant):
     """Register custom services."""
     
-    @callback
     async def handle_run_optimization(call):
         """Handle run_optimization service call."""
         try:
@@ -105,7 +106,6 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error in manual optimization: {e}")
 
-    @callback
     async def handle_start_optimization(call):
         """Handle start_optimization service call."""
         try:
@@ -126,7 +126,6 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error starting optimization: {e}")
 
-    @callback
     async def handle_stop_optimization(call):
         """Handle stop_optimization service call."""
         try:
@@ -144,7 +143,6 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error stopping optimization: {e}")
 
-    @callback
     async def handle_toggle_scheduler(call):
         """Handle toggle_scheduler service call."""
         try:
@@ -200,7 +198,6 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error toggling scheduler: {e}")
 
-    @callback
     async def handle_update_pricing_parameters(call):
         """Handle update_pricing_parameters service call."""
         try:

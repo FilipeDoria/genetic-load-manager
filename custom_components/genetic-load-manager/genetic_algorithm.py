@@ -35,6 +35,10 @@ class GeneticAlgorithm:
         # Initialize pricing calculator
         self.pricing_calculator = IndexedTariffCalculator(hass, config)
         self.use_indexed_pricing = config.get("use_indexed_pricing", True)
+        
+        # Initialize optimization tracking attributes
+        self.best_fitness = float("-inf")
+        self.best_solution = None
 
     async def fetch_forecast_data(self):
         """Fetch and process Solcast PV, load, battery, and pricing data for a 24-hour horizon."""
@@ -201,6 +205,10 @@ class GeneticAlgorithm:
                 "running",
                 attributes={"generation": generation, "best_fitness": max_fitness}
             )
+        
+        # Store the best fitness and solution as instance attributes
+        self.best_fitness = best_fitness
+        self.best_solution = best_solution
         return best_solution
 
     async def schedule_optimization(self):
@@ -214,7 +222,6 @@ class GeneticAlgorithm:
                 )
         await periodic_optimization(datetime.now())
         async_remove_tracker = async_track_time_interval(self.hass, periodic_optimization, timedelta(minutes=15))
-        self.hass.data[DOMAIN]["async_remove_tracker"] = async_remove_tracker
         return async_remove_tracker
 
     async def get_manageable_loads(self):
