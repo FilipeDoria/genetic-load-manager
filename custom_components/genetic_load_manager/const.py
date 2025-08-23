@@ -1,6 +1,6 @@
 """Constants for the Genetic Load Manager integration."""
 
-DOMAIN = "genetic-load-manager"
+DOMAIN = "genetic_load_manager"
 
 # Configuration keys
 CONF_PV_ENTITY_ID = "pv_entity_id"
