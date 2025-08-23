@@ -232,7 +232,7 @@ class GeneticAlgorithm:
     async def tournament_selection(self, fitness_scores):
         tournament_size = 5
         selection = random.sample(range(self.population_size), tournament_size)
-        best_idx = selection[np.argmax([await self.fitness_function(self.population[i]) for i in selection])]
+        best_idx = selection[np.argmax([fitness_scores[i] for i in selection])]
         return self.population[best_idx]
 
     async def crossover(self, parent1, parent2):
