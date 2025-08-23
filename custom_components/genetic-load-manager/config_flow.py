@@ -200,10 +200,13 @@ CONFIG_SCHEMA = vol.Schema({
     ),
 })
 
-class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow):
     """Handle a config flow for Genetic Load Manager."""
 
     VERSION = 1
+    
+    # Set the domain for this config flow
+    DOMAIN = DOMAIN
 
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Handle the initial step."""
