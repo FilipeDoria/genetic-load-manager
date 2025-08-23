@@ -193,7 +193,41 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error toggling scheduler: {e}")
 
+    @callback
+    async def handle_update_pricing_parameters(call):
+        """Handle update_pricing_parameters service call."""
+        try:
+            genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
+            if genetic_algo and hasattr(genetic_algo, 'pricing_calculator'):
+                # Update pricing calculator configuration
+                config_updates = {}
+                for param in ['mfrr', 'q', 'fp', 'tae', 'vat', 'peak_multiplier', 'off_peak_multiplier']:
+                    if param in call.data:
+                        config_updates[param] = call.data[param]
+                
+                if config_updates:
+                    genetic_algo.pricing_calculator.update_config(config_updates)
+                    _LOGGER.info(f"Updated pricing parameters: {config_updates}")
+                    
+                    # Update sensor state
+                    await hass.states.async_set(
+                        "sensor.genetic_algorithm_status",
+                        "pricing_updated",
+                        attributes={
+                            "message": "Pricing parameters updated",
+                            "updated_parameters": list(config_updates.keys()),
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    )
+                else:
+                    _LOGGER.warning("No valid pricing parameters provided")
+            else:
+                _LOGGER.error("Pricing calculator not available")
+        except Exception as e:
+            _LOGGER.error(f"Error updating pricing parameters: {e}")
+
     hass.services.async_register(DOMAIN, "run_optimization", handle_run_optimization)
     hass.services.async_register(DOMAIN, "start_optimization", handle_start_optimization)
     hass.services.async_register(DOMAIN, "stop_optimization", handle_stop_optimization)
     hass.services.async_register(DOMAIN, "toggle_scheduler", handle_toggle_scheduler)
+    hass.services.async_register(DOMAIN, "update_pricing_parameters", handle_update_pricing_parameters)

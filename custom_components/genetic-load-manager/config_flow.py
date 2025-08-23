@@ -116,7 +116,12 @@ CONFIG_SCHEMA = vol.Schema({
     ),
     
     # Pricing Information
-    vol.Required("dynamic_pricing_entity", description="Select Electricity Price Sensor"): create_entity_selector(
+    vol.Optional("use_indexed_pricing", default=True, description="Use indexed tariff pricing calculator"): bool,
+    vol.Optional("dynamic_pricing_entity", description="Select Electricity Price Sensor (fallback if indexed pricing fails)"): create_entity_selector(
+        domain="sensor",
+        device_class="monetary"
+    ),
+    vol.Optional("market_price_entity", description="Select Market Price Entity (e.g., OMIE spot price)"): create_entity_selector(
         domain="sensor",
         device_class="monetary"
     ),
@@ -161,6 +166,38 @@ CONFIG_SCHEMA = vol.Schema({
     
     # Control Options
     vol.Optional("binary_control", default=False, description="Use binary (on/off) control instead of continuous"): bool,
+    
+    # Indexed Pricing Parameters
+    vol.Optional("mfrr", default=1.94, description="Frequency Restoration Reserve (€/MWh)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.0, max=10.0)
+    ),
+    vol.Optional("q", default=30.0, description="Quality component (€/MWh)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.0, max=100.0)
+    ),
+    vol.Optional("fp", default=1.1674, description="Fixed percentage/multiplier"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=1.0, max=2.0)
+    ),
+    vol.Optional("tae", default=60.0, description="Transmission and distribution tariff (€/MWh)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.0, max=200.0)
+    ),
+    vol.Optional("vat", default=1.23, description="VAT multiplier (1.23 = 23%)"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=1.0, max=1.5)
+    ),
+    
+    # Time-of-Use Modifiers
+    vol.Optional("peak_multiplier", default=1.2, description="Peak hours price multiplier"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=1.0, max=2.0)
+    ),
+    vol.Optional("off_peak_multiplier", default=0.8, description="Off-peak hours price multiplier"): vol.All(
+        vol.Coerce(float),
+        vol.Range(min=0.5, max=1.0)
+    ),
 })
 
 class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):

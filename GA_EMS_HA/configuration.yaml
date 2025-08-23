@@ -1,0 +1,32 @@
+# Home Assistant Configuration
+# This file shows how to use the EMS Testing Integration
+
+# The EMS Testing integration is now installed as a custom component
+# and should be configured through the Home Assistant UI, not here.
+
+# To set up the integration:
+# 1. Copy the custom_components/ems_testing folder to your Home Assistant config directory
+# 2. Restart Home Assistant
+# 3. Go to Settings > Devices & Services > Add Integration
+# 4. Search for "EMS Testing Integration"
+# 5. Configure it through the UI
+
+# The old configuration format below is no longer needed:
+# ems_testing:
+#   enable_control: false
+#   optimization_interval: 900
+#   monitored_devices:
+#     - climate.living_room
+#     - switch.ev_charger
+#     - switch.water_heater
+#     - sensor.battery_soc
+#     - sensor.grid_import_power
+#     - sensor.grid_export_power
+#     - sensor.solar_power
+
+# Instead, the integration will:
+# - Monitor your devices automatically
+# - Run optimization every 15 minutes (configurable)
+# - Show results in 5 new sensor entities
+# - Log all optimization results to /config/ems_optimization_log.txt
+# - NOT control any devices (read-only mode for testing)

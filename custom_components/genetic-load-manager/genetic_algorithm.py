@@ -5,6 +5,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 import logging
 from .const import DOMAIN
+<<<<<<< HEAD
+=======
+from .pricing_calculator import IndexedTariffCalculator
+>>>>>>> 47cd93a4028b62536be211b603c1e6cd97fd1741
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +34,13 @@ class GeneticAlgorithm:
         self.max_charge_rate = config.get("max_charge_rate", 2.0)
         self.max_discharge_rate = config.get("max_discharge_rate", 2.0)
         self.binary_control = config.get("binary_control", False)
+<<<<<<< HEAD
+=======
+        
+        # Initialize pricing calculator
+        self.pricing_calculator = IndexedTariffCalculator(hass, config)
+        self.use_indexed_pricing = config.get("use_indexed_pricing", True)
+>>>>>>> 47cd93a4028b62536be211b603c1e6cd97fd1741
 
     async def fetch_forecast_data(self):
         """Fetch and process Solcast PV, load, battery, and pricing data for a 24-hour horizon."""
@@ -96,9 +107,21 @@ class GeneticAlgorithm:
 
         # Fetch battery state and pricing
         battery_state = await self.hass.states.async_get(self.battery_soc_entity)
-        pricing_state = await self.hass.states.async_get(self.dynamic_pricing_entity)
         self.battery_soc = float(battery_state.state) if battery_state else 0.0
-        self.pricing = np.array([float(x) for x in pricing_state.attributes.get("prices", [0.1] * self.time_slots)] if pricing_state else [0.1] * self.time_slots)
+        
+        # Use indexed pricing calculator or fallback to simple pricing
+        if self.use_indexed_pricing:
+            try:
+                self.pricing = await self.pricing_calculator.get_24h_price_forecast(current_time)
+                _LOGGER.info("Using indexed tariff pricing with 96 time slots")
+            except Exception as e:
+                _LOGGER.error(f"Error getting indexed pricing: {e}, falling back to simple pricing")
+                self.use_indexed_pricing = False
+        
+        if not self.use_indexed_pricing:
+            # Fallback to simple dynamic pricing entity
+            pricing_state = await self.hass.states.async_get(self.dynamic_pricing_entity)
+            self.pricing = np.array([float(x) for x in pricing_state.attributes.get("prices", [0.1] * self.time_slots)] if pricing_state else [0.1] * self.time_slots)
         self.pv_forecast = pv_forecast
         _LOGGER.debug(f"PV forecast (96 slots): {pv_forecast.tolist()}")
 

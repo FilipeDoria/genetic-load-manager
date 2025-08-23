@@ -14,7 +14,25 @@ DOMAIN = "genetic_load_manager"
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigType, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
     """Set up the sensor platform for the genetic load manager."""
-    async_add_entities([LoadForecastSensor(hass, entry.data)])
+    sensors = [LoadForecastSensor(hass, entry.data)]
+    
+    # Add pricing sensor if indexed pricing is enabled
+    if entry.data.get("use_indexed_pricing", True):
+        sensors.append(IndexedPricingSensor(hass, entry.data))
+    
+    # Add dashboard sensors
+    from .dashboard import OptimizationDashboardSensor, ScheduleVisualizationSensor
+    from .control_panel import ControlPanelSensor
+    from .analytics import CostAnalyticsSensor
+    
+    sensors.extend([
+        OptimizationDashboardSensor(hass, entry.data),
+        ScheduleVisualizationSensor(hass, entry.data),
+        ControlPanelSensor(hass, entry.data),
+        CostAnalyticsSensor(hass, entry.data)
+    ])
+    
+    async_add_entities(sensors)
 
 class LoadForecastSensor(SensorEntity):
     """Sensor entity for generating a 24-hour load forecast in 15-minute intervals based on last 24 hours of data."""
@@ -152,3 +170,79 @@ class LoadForecastSensor(SensorEntity):
         # This method is kept for backward compatibility but the new implementation
         # uses _generate_forecast_from_last_24h instead
         return await self._generate_forecast_from_last_24h(history)
+
+
+class IndexedPricingSensor(SensorEntity):
+    """Sensor entity for indexed tariff electricity pricing."""
+
+    def __init__(self, hass: HomeAssistant, config: dict):
+        """Initialize the indexed pricing sensor."""
+        self.hass = hass
+        self._attr_unique_id = f"{DOMAIN}_indexed_pricing"
+        self._attr_name = "Indexed Electricity Price"
+        self._attr_unit_of_measurement = "€/kWh"
+        self._attr_device_class = "monetary"
+        self._attr_state_class = "measurement"
+        self._state = None
+        self._pricing_components = {}
+        self._forecast = []
+        
+        # Import here to avoid circular imports
+        from .pricing_calculator import IndexedTariffCalculator
+        self.pricing_calculator = IndexedTariffCalculator(hass, config)
+
+    @property
+    def state(self):
+        """Return the current electricity price."""
+        return self._state
+
+    @property
+    def extra_state_attributes(self):
+        """Return detailed pricing information as attributes."""
+        attrs = {
+            "pricing_components": self._pricing_components,
+            "24h_forecast": self._forecast,
+            "pricing_method": "indexed_tariff",
+            "last_updated": datetime.now().isoformat()
+        }
+        
+        # Add configuration details
+        attrs.update({
+            "mfrr": self.pricing_calculator.mfrr,
+            "quality_component": self.pricing_calculator.q,
+            "fixed_percentage": self.pricing_calculator.fp,
+            "transmission_tariff": self.pricing_calculator.tae,
+            "vat": self.pricing_calculator.vat,
+            "peak_multiplier": self.pricing_calculator.peak_multiplier,
+            "off_peak_multiplier": self.pricing_calculator.off_peak_multiplier
+        })
+        
+        return attrs
+
+    async def async_added_to_hass(self):
+        """Set up periodic updates for the sensor."""
+        async_track_time_interval(self.hass, self.async_update, timedelta(minutes=5))
+        await self.async_update()
+
+    async def async_update(self):
+        """Update the sensor with current pricing information."""
+        try:
+            # Get current price
+            current_price = await self.pricing_calculator.get_current_price()
+            self._state = round(current_price, 6)
+            
+            # Get current market price for component breakdown
+            market_price = await self.pricing_calculator.get_current_market_price()
+            self._pricing_components = self.pricing_calculator.get_pricing_components(market_price)
+            
+            # Get 24-hour forecast (sample every hour for attributes)
+            forecast_96 = await self.pricing_calculator.get_24h_price_forecast()
+            # Sample every 4th value (hourly instead of 15-minute intervals) for attributes
+            self._forecast = [round(forecast_96[i], 6) for i in range(0, 96, 4)]
+            
+            _LOGGER.debug(f"Updated indexed pricing: {self._state} €/kWh (market: {market_price} €/MWh)")
+            
+        except Exception as e:
+            _LOGGER.error(f"Error updating indexed pricing sensor: {e}")
+            if self._state is None:
+                self._state = 0.1  # Fallback price

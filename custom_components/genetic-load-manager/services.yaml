@@ -230,4 +230,75 @@ export_schedule:
       description: "Include optimization metadata in export"
       selector:
         boolean:
-          default: true 
+          default: true
+
+update_pricing_parameters:
+  name: "Update Pricing Parameters"
+  description: "Update indexed tariff pricing parameters"
+  fields:
+    mfrr:
+      name: "Frequency Restoration Reserve"
+      description: "MFRR component in €/MWh"
+      selector:
+        number:
+          min: 0.0
+          max: 10.0
+          default: 1.94
+          step: 0.01
+          unit_of_measurement: "€/MWh"
+    q:
+      name: "Quality Component"
+      description: "Quality component in €/MWh"
+      selector:
+        number:
+          min: 0.0
+          max: 100.0
+          default: 30.0
+          step: 0.1
+          unit_of_measurement: "€/MWh"
+    fp:
+      name: "Fixed Percentage"
+      description: "Fixed percentage multiplier"
+      selector:
+        number:
+          min: 1.0
+          max: 2.0
+          default: 1.1674
+          step: 0.0001
+    tae:
+      name: "Transmission Tariff"
+      description: "Transmission and distribution tariff in €/MWh"
+      selector:
+        number:
+          min: 0.0
+          max: 200.0
+          default: 60.0
+          step: 0.1
+          unit_of_measurement: "€/MWh"
+    vat:
+      name: "VAT Multiplier"
+      description: "VAT multiplier (1.23 = 23%)"
+      selector:
+        number:
+          min: 1.0
+          max: 1.5
+          default: 1.23
+          step: 0.01
+    peak_multiplier:
+      name: "Peak Hours Multiplier"
+      description: "Price multiplier for peak hours"
+      selector:
+        number:
+          min: 1.0
+          max: 2.0
+          default: 1.2
+          step: 0.1
+    off_peak_multiplier:
+      name: "Off-Peak Hours Multiplier"
+      description: "Price multiplier for off-peak hours"
+      selector:
+        number:
+          min: 0.5
+          max: 1.0
+          default: 0.8
+          step: 0.1 
