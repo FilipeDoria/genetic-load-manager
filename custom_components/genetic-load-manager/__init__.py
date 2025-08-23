@@ -16,8 +16,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up Genetic Load Manager from configuration."""
     hass.data[DOMAIN] = {}
     conf = config.get(DOMAIN, {})
-    genetic_algo = GeneticLoadOptimizer(hass, conf)
-    hass.data[DOMAIN]["genetic_algorithm"] = genetic_algo
+    
+    # Only create genetic algorithm instance if configuration is provided
+    if conf:
+        try:
+            genetic_algo = GeneticLoadOptimizer(hass, conf)
+            hass.data[DOMAIN]["genetic_algorithm"] = genetic_algo
+        except Exception as e:
+            _LOGGER.warning(f"Could not initialize genetic algorithm with config: {e}")
+    
     await async_register_services(hass)
     return True
 
