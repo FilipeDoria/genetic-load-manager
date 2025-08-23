@@ -1,5 +1,5 @@
 {
-  "domain": "genetic-load-manager",
+  "domain": "genetic_load_manager",
   "name": "Genetic Load Manager",
   "version": "1.3.5",
   "documentation": "https://github.com/filipe0doria/genetic-load-manager",
@@ -8,5 +8,6 @@
   "requirements": ["numpy"],
   "codeowners": ["@filipe0doria"],
   "iot_class": "local_polling",
-  "config_flow": true
+  "config_flow": true,
+  "import_executor": false
 } 
