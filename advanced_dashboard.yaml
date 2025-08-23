@@ -1,0 +1,672 @@
+# Advanced Genetic Load Manager Dashboard
+# Modern, responsive UI with charts and interactive elements
+# Requires: mini-graph-card, button-card, apexcharts-card (HACS custom cards)
+
+title: "🧬 Genetic Load Manager"
+path: genetic-load-manager
+icon: mdi:dna
+panel: false
+cards:
+
+# ==================================================
+# HEADER STATUS BAR
+# ==================================================
+- type: horizontal-stack
+  cards:
+    - type: custom:button-card
+      entity: sensor.genetic_load_manager_dashboard
+      name: "System Health"
+      show_state: true
+      show_icon: true
+      icon: mdi:heart-pulse
+      styles:
+        card:
+          - background: >
+              [[[
+                if (entity.state > 80) return 'linear-gradient(135deg, #4CAF50, #8BC34A)';
+                if (entity.state > 60) return 'linear-gradient(135deg, #FF9800, #FFC107)';
+                return 'linear-gradient(135deg, #F44336, #E91E63)';
+              ]]]
+          - color: white
+          - border-radius: 15px
+          - height: 80px
+        name:
+          - font-size: 14px
+          - font-weight: bold
+        state:
+          - font-size: 24px
+          - font-weight: bold
+      tap_action:
+        action: more-info
+
+    - type: custom:button-card
+      entity: sensor.genetic_load_manager_indexed_pricing
+      name: "Current Price"
+      show_state: true
+      show_icon: true
+      icon: mdi:currency-eur
+      styles:
+        card:
+          - background: linear-gradient(135deg, #2196F3, #03DAC6)
+          - color: white
+          - border-radius: 15px
+          - height: 80px
+        name:
+          - font-size: 14px
+          - font-weight: bold
+        state:
+          - font-size: 20px
+          - font-weight: bold
+
+    - type: custom:button-card
+      entity: sensor.cost_analytics
+      name: "Today's Savings"
+      show_state: true
+      show_icon: true
+      icon: mdi:piggy-bank
+      styles:
+        card:
+          - background: linear-gradient(135deg, #4CAF50, #66BB6A)
+          - color: white
+          - border-radius: 15px
+          - height: 80px
+        name:
+          - font-size: 14px
+          - font-weight: bold
+        state:
+          - font-size: 20px
+          - font-weight: bold
+      tap_action:
+        action: more-info
+
+    - type: custom:button-card
+      entity: sensor.genetic_algorithm_status
+      name: "Status"
+      show_state: true
+      show_icon: true
+      icon: mdi:dna
+      styles:
+        card:
+          - background: >
+              [[[
+                if (entity.state === 'running') return 'linear-gradient(135deg, #4CAF50, #8BC34A)';
+                if (entity.state === 'active') return 'linear-gradient(135deg, #2196F3, #03DAC6)';
+                return 'linear-gradient(135deg, #9E9E9E, #BDBDBD)';
+              ]]]
+          - color: white
+          - border-radius: 15px
+          - height: 80px
+        name:
+          - font-size: 14px
+          - font-weight: bold
+        state:
+          - font-size: 16px
+          - font-weight: bold
+
+# ==================================================
+# MAIN DASHBOARD GRID
+# ==================================================
+- type: grid
+  columns: 3
+  square: false
+  cards:
+    
+    # OPTIMIZATION PROGRESS CARD
+    - type: vertical-stack
+      cards:
+        - type: custom:button-card
+          name: "🚀 Optimization Progress"
+          styles:
+            card:
+              - background: none
+              - border: none
+              - box-shadow: none
+            name:
+              - font-size: 18px
+              - font-weight: bold
+              - color: var(--primary-text-color)
+        
+        - type: gauge
+          entity: sensor.genetic_load_manager_dashboard
+          name: "System Health"
+          min: 0
+          max: 100
+          needle: true
+          severity:
+            green: 80
+            yellow: 60
+            red: 0
+        
+        - type: entities
+          show_header_toggle: false
+          entities:
+            - type: attribute
+              entity: sensor.genetic_load_manager_dashboard
+              attribute: quick_stats.next_optimization
+              name: "Next Optimization"
+              icon: mdi:clock-outline
+            
+            - type: attribute
+              entity: sensor.genetic_load_manager_dashboard
+              attribute: quick_stats.active_optimizations
+              name: "Active Optimizations"
+              icon: mdi:cog-play
+
+    # COST ANALYSIS CARD
+    - type: vertical-stack
+      cards:
+        - type: custom:button-card
+          name: "💰 Cost Analysis"
+          styles:
+            card:
+              - background: none
+              - border: none
+              - box-shadow: none
+            name:
+              - font-size: 18px
+              - font-weight: bold
+              - color: var(--primary-text-color)
+        
+        - type: custom:apexcharts-card
+          header:
+            show: false
+          chart_type: line
+          height: 200
+          series:
+            - entity: sensor.cost_analytics
+              attribute: chart_data.daily_savings_trend.datasets.0.data
+              name: "Daily Savings"
+              color: "#4CAF50"
+              stroke_width: 3
+          graph_span: 14d
+          span:
+            end: day
+        
+        - type: horizontal-stack
+          cards:
+            - type: entity
+              entity: sensor.cost_analytics
+              attribute: financial_summary.monthly_projection
+              name: "Monthly"
+              icon: mdi:calendar-month
+            
+            - type: entity
+              entity: sensor.cost_analytics
+              attribute: financial_summary.annual_projection
+              name: "Annual"
+              icon: mdi:calendar-range
+
+    # DEVICE CONTROL CARD
+    - type: vertical-stack
+      cards:
+        - type: custom:button-card
+          name: "🎛️ Device Control"
+          styles:
+            card:
+              - background: none
+              - border: none
+              - box-shadow: none
+            name:
+              - font-size: 18px
+              - font-weight: bold
+              - color: var(--primary-text-color)
+        
+        - type: grid
+          columns: 2
+          square: true
+          cards:
+            - type: custom:button-card
+              entity: switch.device_0_schedule
+              name: "Device 0"
+              show_state: true
+              show_icon: true
+              icon: mdi:power-plug
+              tap_action:
+                action: toggle
+              styles:
+                card:
+                  - border-radius: 15px
+                  - height: 80px
+                  - background: >
+                      [[[
+                        if (entity.state === 'on') return 'linear-gradient(135deg, #4CAF50, #8BC34A)';
+                        return 'linear-gradient(135deg, #9E9E9E, #BDBDBD)';
+                      ]]]
+                  - color: white
+                name:
+                  - font-weight: bold
+                state:
+                  - font-size: 14px
+            
+            - type: custom:button-card
+              entity: switch.device_1_schedule
+              name: "Device 1"
+              show_state: true
+              show_icon: true
+              icon: mdi:power-plug
+              tap_action:
+                action: toggle
+              styles:
+                card:
+                  - border-radius: 15px
+                  - height: 80px
+                  - background: >
+                      [[[
+                        if (entity.state === 'on') return 'linear-gradient(135deg, #4CAF50, #8BC34A)';
+                        return 'linear-gradient(135deg, #9E9E9E, #BDBDBD)';
+                      ]]]
+                  - color: white
+                name:
+                  - font-weight: bold
+                state:
+                  - font-size: 14px
+        
+        - type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              name: "🚀 Optimize"
+              icon: mdi:play-circle
+              tap_action:
+                action: call-service
+                service: genetic_load_manager.run_optimization
+              styles:
+                card:
+                  - background: linear-gradient(135deg, #4CAF50, #66BB6A)
+                  - color: white
+                  - border-radius: 10px
+                  - height: 50px
+                name:
+                  - font-weight: bold
+            
+            - type: custom:button-card
+              name: "⏸️ Stop"
+              icon: mdi:stop-circle
+              tap_action:
+                action: call-service
+                service: genetic_load_manager.stop_optimization
+              styles:
+                card:
+                  - background: linear-gradient(135deg, #F44336, #E57373)
+                  - color: white
+                  - border-radius: 10px
+                  - height: 50px
+                name:
+                  - font-weight: bold
+
+# ==================================================
+# DETAILED ANALYTICS ROW
+# ==================================================
+- type: horizontal-stack
+  cards:
+    
+    # HOURLY PRICING CHART
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: "⚡ 24-Hour Pricing"
+      chart_type: column
+      height: 300
+      series:
+        - entity: sensor.genetic_load_manager_indexed_pricing
+          attribute: 24h_forecast
+          name: "Price (€/kWh)"
+          color: "#FF9800"
+      xaxis:
+        - categories:
+            - "00:00"
+            - "01:00"
+            - "02:00"
+            - "03:00"
+            - "04:00"
+            - "05:00"
+            - "06:00"
+            - "07:00"
+            - "08:00"
+            - "09:00"
+            - "10:00"
+            - "11:00"
+            - "12:00"
+            - "13:00"
+            - "14:00"
+            - "15:00"
+            - "16:00"
+            - "17:00"
+            - "18:00"
+            - "19:00"
+            - "20:00"
+            - "21:00"
+            - "22:00"
+            - "23:00"
+
+    # EFFICIENCY RADAR CHART
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: "📊 System Efficiency"
+      chart_type: radialBar
+      height: 300
+      series:
+        - entity: sensor.cost_analytics
+          attribute: efficiency_metrics.overall_system_efficiency
+          name: "Overall"
+          color: "#2196F3"
+        
+        - entity: sensor.cost_analytics
+          attribute: efficiency_metrics.solar_utilization_percent
+          name: "Solar"
+          color: "#FF9800"
+        
+        - entity: sensor.cost_analytics
+          attribute: efficiency_metrics.load_optimization_percent
+          name: "Load"
+          color: "#4CAF50"
+
+    # DEVICE PERFORMANCE
+    - type: vertical-stack
+      cards:
+        - type: custom:button-card
+          name: "📈 Device Performance"
+          styles:
+            card:
+              - background: none
+              - border: none
+              - box-shadow: none
+            name:
+              - font-size: 16px
+              - font-weight: bold
+        
+        - type: custom:apexcharts-card
+          chart_type: donut
+          height: 250
+          series:
+            - entity: sensor.cost_analytics
+              attribute: device_costs.device_0.cost_today
+              name: "Device 0"
+              color: "#FF6B6B"
+            
+            - entity: sensor.cost_analytics
+              attribute: device_costs.device_1.cost_today
+              name: "Device 1"
+              color: "#4ECDC4"
+
+# ==================================================
+# SCHEDULE TIMELINE
+# ==================================================
+- type: custom:apexcharts-card
+  header:
+    show: true
+    title: "📅 24-Hour Schedule Timeline"
+  chart_type: area
+  height: 200
+  stacked: true
+  series:
+    - entity: sensor.schedule_visualization
+      attribute: schedule_data.predicted_schedule
+      data_generator: |
+        return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
+          x: slot.time,
+          y: slot.devices.device_0 * 1000  // Convert to watts
+        }));
+      name: "Device 0 (W)"
+      color: "#FF6B6B"
+    
+    - entity: sensor.schedule_visualization
+      attribute: schedule_data.predicted_schedule
+      data_generator: |
+        return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
+          x: slot.time,
+          y: slot.devices.device_1 * 1000  // Convert to watts
+        }));
+      name: "Device 1 (W)"
+      color: "#4ECDC4"
+    
+    - entity: sensor.schedule_visualization
+      attribute: schedule_data.predicted_schedule
+      data_generator: |
+        return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
+          x: slot.time,
+          y: slot.solar_forecast * 1000  // Convert to watts
+        }));
+      name: "Solar (W)"
+      color: "#FFE66D"
+
+# ==================================================
+# CONTROL PANEL
+# ==================================================
+- type: vertical-stack
+  cards:
+    - type: custom:button-card
+      name: "🎛️ Advanced Controls"
+      styles:
+        card:
+          - background: none
+          - border: none
+          - box-shadow: none
+        name:
+          - font-size: 20px
+          - font-weight: bold
+          - color: var(--primary-text-color)
+    
+    - type: grid
+      columns: 4
+      square: false
+      cards:
+        - type: custom:button-card
+          name: "Quick Optimize"
+          icon: mdi:flash
+          tap_action:
+            action: call-service
+            service: genetic_load_manager.run_optimization
+            service_data:
+              population_size: 50
+              generations: 100
+          styles:
+            card:
+              - background: linear-gradient(135deg, #4CAF50, #66BB6A)
+              - color: white
+              - border-radius: 15px
+              - height: 100px
+            name:
+              - font-weight: bold
+              - font-size: 14px
+        
+        - type: custom:button-card
+          name: "Toggle Mode"
+          icon: mdi:swap-horizontal
+          tap_action:
+            action: call-service
+            service: genetic_load_manager.toggle_scheduler
+            service_data:
+              mode: rule-based
+          styles:
+            card:
+              - background: linear-gradient(135deg, #2196F3, #42A5F5)
+              - color: white
+              - border-radius: 15px
+              - height: 100px
+            name:
+              - font-weight: bold
+              - font-size: 14px
+        
+        - type: custom:button-card
+          name: "Update Pricing"
+          icon: mdi:currency-eur
+          tap_action:
+            action: call-service
+            service: genetic_load_manager.update_pricing_parameters
+          styles:
+            card:
+              - background: linear-gradient(135deg, #FF9800, #FFB74D)
+              - color: white
+              - border-radius: 15px
+              - height: 100px
+            name:
+              - font-weight: bold
+              - font-size: 14px
+        
+        - type: custom:button-card
+          name: "Export Data"
+          icon: mdi:download
+          tap_action:
+            action: call-service
+            service: genetic_load_manager.export_schedule
+            service_data:
+              format: json
+          styles:
+            card:
+              - background: linear-gradient(135deg, #9C27B0, #BA68C8)
+              - color: white
+              - border-radius: 15px
+              - height: 100px
+            name:
+              - font-weight: bold
+              - font-size: 14px
+
+# ==================================================
+# SYSTEM INFORMATION PANEL
+# ==================================================
+- type: entities
+  title: "ℹ️ System Information"
+  show_header_toggle: false
+  entities:
+    - entity: binary_sensor.genetic_load_manager_optimization_running
+      name: "Optimization Running"
+      icon: mdi:play-circle
+    
+    - entity: binary_sensor.genetic_load_manager_system_healthy
+      name: "System Healthy"
+      icon: mdi:heart-pulse
+    
+    - entity: binary_sensor.genetic_load_manager_loads_controlled
+      name: "Loads Controlled"
+      icon: mdi:lightning-bolt
+    
+    - entity: binary_sensor.genetic_load_manager_algorithm_error
+      name: "Algorithm Errors"
+      icon: mdi:alert-circle
+    
+    - type: divider
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.solar_production_today
+      name: "Solar Production Today"
+      icon: mdi:solar-power
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.grid_import_today
+      name: "Grid Import Today"
+      icon: mdi:transmission-tower
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.battery_cycles_today
+      name: "Battery Cycles Today"
+      icon: mdi:battery-charging
+
+# ==================================================
+# EMERGENCY CONTROLS (CONDITIONAL)
+# ==================================================
+- type: conditional
+  conditions:
+    - entity: binary_sensor.genetic_load_manager_algorithm_error
+      state: "on"
+  card:
+    type: vertical-stack
+    cards:
+      - type: markdown
+        content: |
+          ## ⚠️ System Alert
+          There are issues with the genetic algorithm. Emergency controls are available below.
+      
+      - type: horizontal-stack
+        cards:
+          - type: custom:button-card
+            name: "🛑 Emergency Stop"
+            icon: mdi:emergency-stop
+            tap_action:
+              action: call-service
+              service: genetic_load_manager.stop_optimization
+            styles:
+              card:
+                - background: linear-gradient(135deg, #F44336, #E57373)
+                - color: white
+                - border-radius: 10px
+                - height: 60px
+              name:
+                - font-weight: bold
+          
+          - type: custom:button-card
+            name: "🔄 Reset System"
+            icon: mdi:restart
+            tap_action:
+              action: call-service
+              service: homeassistant.reload_config_entry
+              target:
+                entity_id: sensor.genetic_load_manager_dashboard
+            styles:
+              card:
+                - background: linear-gradient(135deg, #FF9800, #FFB74D)
+                - color: white
+                - border-radius: 10px
+                - height: 60px
+              name:
+                - font-weight: bold
+
+# ==================================================
+# MOBILE COMPACT VIEW (CONDITIONAL)
+# ==================================================
+- type: conditional
+  conditions:
+    - condition: screen
+      media_query: "(max-width: 768px)"
+  card:
+    type: vertical-stack
+    title: "📱 Mobile View"
+    cards:
+      - type: glance
+        title: "Quick Status"
+        entities:
+          - entity: sensor.genetic_load_manager_dashboard
+            name: "Health"
+          - entity: sensor.genetic_load_manager_indexed_pricing
+            name: "Price"
+          - entity: sensor.cost_analytics
+            name: "Savings"
+      
+      - type: horizontal-stack
+        cards:
+          - type: custom:button-card
+            entity: switch.device_0_schedule
+            name: "D0"
+            show_state: true
+            tap_action:
+              action: toggle
+            styles:
+              card:
+                - height: 60px
+                - border-radius: 10px
+          
+          - type: custom:button-card
+            entity: switch.device_1_schedule
+            name: "D1"
+            show_state: true
+            tap_action:
+              action: toggle
+            styles:
+              card:
+                - height: 60px
+                - border-radius: 10px
+          
+          - type: custom:button-card
+            name: "⚡"
+            tap_action:
+              action: call-service
+              service: genetic_load_manager.run_optimization
+            styles:
+              card:
+                - height: 60px
+                - border-radius: 10px
+                - background: "#4CAF50"
+                - color: white

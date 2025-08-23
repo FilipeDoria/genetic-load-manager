@@ -1,0 +1,414 @@
+# Genetic Load Manager - Lovelace Dashboard Cards
+# Copy these card configurations to your Home Assistant dashboard
+
+# ==================================================
+# MAIN OPTIMIZATION DASHBOARD
+# ==================================================
+- type: vertical-stack
+  title: "🧬 Genetic Load Manager Dashboard"
+  cards:
+    # Status Overview Card
+    - type: horizontal-stack
+      cards:
+        - type: entity
+          entity: sensor.genetic_load_manager_dashboard
+          name: "System Health"
+          icon: mdi:heart-pulse
+          state_color: true
+        
+        - type: entity
+          entity: sensor.genetic_load_manager_indexed_pricing
+          name: "Current Price"
+          icon: mdi:currency-eur
+          state_color: true
+        
+        - type: entity
+          entity: sensor.genetic_algorithm_status
+          name: "Optimization Status"
+          icon: mdi:dna
+          state_color: true
+        
+        - type: entity
+          entity: sensor.schedule_visualization
+          name: "Active Schedules"
+          icon: mdi:calendar-clock
+          state_color: true
+
+    # Quick Stats Card
+    - type: entities
+      title: "📊 Quick Statistics"
+      show_header_toggle: false
+      entities:
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.daily_cost_savings
+          name: "Daily Savings"
+          icon: mdi:piggy-bank
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.system_efficiency
+          name: "System Efficiency"
+          icon: mdi:speedometer
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.solar_production_today
+          name: "Solar Production Today"
+          icon: mdi:solar-power
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.next_optimization
+          name: "Next Optimization"
+          icon: mdi:clock-outline
+
+    # System Health Details
+    - type: conditional
+      conditions:
+        - entity: sensor.genetic_load_manager_dashboard
+          attribute: dashboard_data.system_health.status
+          state_not: "healthy"
+      card:
+        type: markdown
+        title: "⚠️ System Issues"
+        content: |
+          {% set issues = state_attr('sensor.genetic_load_manager_dashboard', 'dashboard_data')['system_health']['issues'] %}
+          {% for issue in issues %}
+          - {{ issue }}
+          {% endfor %}
+
+# ==================================================
+# COST ANALYSIS DASHBOARD
+# ==================================================
+- type: vertical-stack
+  title: "💰 Cost Analysis"
+  cards:
+    # Cost Savings Overview
+    - type: horizontal-stack
+      cards:
+        - type: entity
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: dashboard_data.cost_savings.daily
+          name: "Daily Savings"
+          icon: mdi:cash-plus
+          unit: "€"
+        
+        - type: entity
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: dashboard_data.cost_savings.weekly
+          name: "Weekly Savings"
+          icon: mdi:cash-multiple
+          unit: "€"
+        
+        - type: entity
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: dashboard_data.cost_savings.monthly
+          name: "Monthly Savings"
+          icon: mdi:piggy-bank-outline
+          unit: "€"
+
+    # Pricing Information
+    - type: entities
+      title: "⚡ Current Electricity Pricing"
+      show_header_toggle: false
+      entities:
+        - entity: sensor.genetic_load_manager_indexed_pricing
+          name: "Current Price"
+          icon: mdi:currency-eur
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_indexed_pricing
+          attribute: pricing_components.market_price
+          name: "Market Price (OMIE)"
+          icon: mdi:chart-line
+          unit: "€/MWh"
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_indexed_pricing
+          attribute: pricing_components.final_price_kwh
+          name: "Final Price"
+          icon: mdi:calculator
+          unit: "€/kWh"
+
+    # Price Components Breakdown
+    - type: entities
+      title: "🔍 Price Components"
+      show_header_toggle: false
+      entities:
+        - type: attribute
+          entity: sensor.genetic_load_manager_indexed_pricing
+          attribute: mfrr
+          name: "Frequency Reserve (MFRR)"
+          icon: mdi:sine-wave
+          unit: "€/MWh"
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_indexed_pricing
+          attribute: quality_component
+          name: "Quality Component"
+          icon: mdi:quality-high
+          unit: "€/MWh"
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_indexed_pricing
+          attribute: transmission_tariff
+          name: "Transmission Tariff"
+          icon: mdi:transmission-tower
+          unit: "€/MWh"
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_indexed_pricing
+          attribute: vat
+          name: "VAT Multiplier"
+          icon: mdi:percent
+
+# ==================================================
+# SCHEDULE VISUALIZATION
+# ==================================================
+- type: vertical-stack
+  title: "📅 Schedule & Timeline"
+  cards:
+    # Current Schedule Status
+    - type: entities
+      title: "🔄 Current Schedule Status"
+      show_header_toggle: false
+      entities:
+        - entity: switch.device_0_schedule
+          name: "Device 0"
+          icon: mdi:power-plug
+        
+        - entity: switch.device_1_schedule
+          name: "Device 1"
+          icon: mdi:power-plug
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: dashboard_data.current_status
+          name: "Optimization Status"
+          icon: mdi:cog
+
+    # Schedule Preview (Next 8 Hours)
+    - type: markdown
+      title: "⏰ Schedule Preview (Next 8 Hours)"
+      content: |
+        {% set preview = state_attr('sensor.genetic_load_manager_dashboard', 'dashboard_data')['schedule_preview'] %}
+        | Time | Price | Device 0 | Device 1 | Solar | Load |
+        |------|-------|----------|----------|-------|------|
+        {% for slot in preview %}
+        | {{ slot.time }} | €{{ "%.4f"|format(slot.price) }} | {{ slot.devices.device_0 }} | {{ slot.devices.device_1 }} | {{ slot.solar_forecast }} kW | {{ slot.load_forecast }} kW |
+        {% endfor %}
+
+    # Device Timeline
+    - type: entities
+      title: "📈 Device Performance Today"
+      show_header_toggle: false
+      entities:
+        - type: attribute
+          entity: sensor.schedule_visualization
+          attribute: schedule_data.device_timelines.device_0.total_runtime_today
+          name: "Device 0 Runtime"
+          icon: mdi:clock-outline
+          unit: "hours"
+        
+        - type: attribute
+          entity: sensor.schedule_visualization
+          attribute: schedule_data.device_timelines.device_0.energy_consumed_today
+          name: "Device 0 Energy"
+          icon: mdi:lightning-bolt
+          unit: "kWh"
+        
+        - type: attribute
+          entity: sensor.schedule_visualization
+          attribute: schedule_data.device_timelines.device_0.cost_today
+          name: "Device 0 Cost"
+          icon: mdi:currency-eur
+          unit: "€"
+
+# ==================================================
+# CONTROL PANEL
+# ==================================================
+- type: vertical-stack
+  title: "🎛️ Control Panel"
+  cards:
+    # Manual Controls
+    - type: entities
+      title: "🔧 Manual Controls"
+      show_header_toggle: false
+      entities:
+        - entity: switch.device_0_schedule
+          name: "Device 0"
+          icon: mdi:power-plug
+        
+        - entity: switch.device_1_schedule
+          name: "Device 1"
+          icon: mdi:power-plug
+        
+        - type: call-service
+          name: "🚀 Run Optimization"
+          service: genetic_load_manager.run_optimization
+          icon: mdi:play-circle
+        
+        - type: call-service
+          name: "⏸️ Stop Optimization"
+          service: genetic_load_manager.stop_optimization
+          icon: mdi:stop-circle
+
+    # Service Controls
+    - type: entities
+      title: "⚙️ Advanced Controls"
+      show_header_toggle: false
+      entities:
+        - type: call-service
+          name: "🔄 Toggle Scheduler Mode"
+          service: genetic_load_manager.toggle_scheduler
+          service_data:
+            mode: "rule-based"
+          icon: mdi:swap-horizontal
+        
+        - type: call-service
+          name: "💰 Update Pricing"
+          service: genetic_load_manager.update_pricing_parameters
+          icon: mdi:currency-eur
+        
+        - type: call-service
+          name: "📊 Export Schedule"
+          service: genetic_load_manager.export_schedule
+          service_data:
+            format: "json"
+          icon: mdi:download
+
+    # System Information
+    - type: entities
+      title: "ℹ️ System Information"
+      show_header_toggle: false
+      entities:
+        - entity: binary_sensor.genetic_load_manager_optimization_running
+          name: "Optimization Running"
+          icon: mdi:play-circle
+        
+        - entity: binary_sensor.genetic_load_manager_system_healthy
+          name: "System Healthy"
+          icon: mdi:heart-pulse
+        
+        - entity: binary_sensor.genetic_load_manager_loads_controlled
+          name: "Loads Controlled"
+          icon: mdi:lightning-bolt
+        
+        - entity: binary_sensor.genetic_load_manager_algorithm_error
+          name: "Algorithm Errors"
+          icon: mdi:alert-circle
+
+# ==================================================
+# EFFICIENCY MONITORING
+# ==================================================
+- type: vertical-stack
+  title: "⚡ Efficiency Monitoring"
+  cards:
+    # Efficiency Metrics
+    - type: horizontal-stack
+      cards:
+        - type: entity
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: dashboard_data.efficiency_metrics.solar_utilization
+          name: "Solar Utilization"
+          icon: mdi:solar-power
+          unit: "%"
+        
+        - type: entity
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: dashboard_data.efficiency_metrics.load_optimization
+          name: "Load Optimization"
+          icon: mdi:speedometer
+          unit: "%"
+        
+        - type: entity
+          entity: sensor.load_forecast
+          name: "Load Forecast"
+          icon: mdi:chart-line
+          unit: "kWh"
+
+    # Performance Trends
+    - type: markdown
+      title: "📈 Performance Trends (Last 24 Hours)"
+      content: |
+        {% set trends = state_attr('sensor.genetic_load_manager_dashboard', 'dashboard_data')['performance_trends'] %}
+        {% if trends %}
+        **Latest Performance Data:**
+        {% for trend in trends[-5:] %}
+        - **{{ trend.time }}**: Health {{ trend.health }}%, Savings €{{ "%.2f"|format(trend.savings) }}
+        {% endfor %}
+        {% else %}
+        *No trend data available yet*
+        {% endif %}
+
+    # Energy Flow Summary
+    - type: entities
+      title: "🔄 Energy Flow Today"
+      show_header_toggle: false
+      entities:
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.solar_production_today
+          name: "Solar Production"
+          icon: mdi:solar-power
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.grid_import_today
+          name: "Grid Import"
+          icon: mdi:transmission-tower
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.battery_cycles_today
+          name: "Battery Cycles"
+          icon: mdi:battery-charging
+
+# ==================================================
+# MOBILE-FRIENDLY COMPACT VIEW
+# ==================================================
+- type: vertical-stack
+  title: "📱 Mobile Dashboard"
+  cards:
+    # Compact Status
+    - type: glance
+      title: "System Status"
+      entities:
+        - entity: sensor.genetic_load_manager_dashboard
+          name: "Health"
+        - entity: sensor.genetic_load_manager_indexed_pricing
+          name: "Price"
+        - entity: sensor.genetic_algorithm_status
+          name: "Status"
+
+    # Quick Actions
+    - type: horizontal-stack
+      cards:
+        - type: entity
+          entity: switch.device_0_schedule
+          name: "Device 0"
+          tap_action:
+            action: toggle
+        
+        - type: entity
+          entity: switch.device_1_schedule
+          name: "Device 1"
+          tap_action:
+            action: toggle
+
+    # Essential Info
+    - type: entities
+      show_header_toggle: false
+      entities:
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.daily_cost_savings
+          name: "Today's Savings"
+          icon: mdi:piggy-bank
+        
+        - type: attribute
+          entity: sensor.genetic_load_manager_dashboard
+          attribute: quick_stats.next_optimization
+          name: "Next Optimization"
+          icon: mdi:clock-outline
