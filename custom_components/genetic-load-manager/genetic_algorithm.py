@@ -5,10 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 import logging
 from .const import DOMAIN
-<<<<<<< HEAD
-=======
 from .pricing_calculator import IndexedTariffCalculator
->>>>>>> 47cd93a4028b62536be211b603c1e6cd97fd1741
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,13 +31,10 @@ class GeneticAlgorithm:
         self.max_charge_rate = config.get("max_charge_rate", 2.0)
         self.max_discharge_rate = config.get("max_discharge_rate", 2.0)
         self.binary_control = config.get("binary_control", False)
-<<<<<<< HEAD
-=======
         
         # Initialize pricing calculator
         self.pricing_calculator = IndexedTariffCalculator(hass, config)
         self.use_indexed_pricing = config.get("use_indexed_pricing", True)
->>>>>>> 47cd93a4028b62536be211b603c1e6cd97fd1741
 
     async def fetch_forecast_data(self):
         """Fetch and process Solcast PV, load, battery, and pricing data for a 24-hour horizon."""

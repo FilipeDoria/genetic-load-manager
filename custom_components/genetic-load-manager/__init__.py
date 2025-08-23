@@ -5,7 +5,7 @@ from datetime import timedelta, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
-from .genetic_algorithm import GeneticLoadOptimizer
+from .genetic_algorithm import GeneticAlgorithm
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up Genetic Load Manager from configuration."""
     hass.data[DOMAIN] = {}
     conf = config.get(DOMAIN, {})
-    genetic_algo = GeneticLoadOptimizer(hass, conf)
+    genetic_algo = GeneticAlgorithm(hass, conf)
     hass.data[DOMAIN]["genetic_algorithm"] = genetic_algo
     await async_register_services(hass)
     return True
@@ -27,7 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = entry.data
     
     try:
-        genetic_algo = GeneticLoadOptimizer(hass, entry.data)
+        genetic_algo = GeneticAlgorithm(hass, entry.data)
         hass.data[DOMAIN]['genetic_algorithm'] = genetic_algo
         await genetic_algo.start()
         _LOGGER.info("Genetic Load Manager optimizer started successfully")
