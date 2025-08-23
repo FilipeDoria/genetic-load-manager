@@ -1,0 +1,11 @@
+{
+  "domain": "ems_testing",
+  "name": "EMS Testing Integration",
+  "documentation": "https://github.com/yourusername/ems_testing",
+  "dependencies": [],
+  "codeowners": ["@yourusername"],
+  "requirements": ["numpy"],
+  "version": "1.0.0",
+  "config_flow": true,
+  "iot_class": "local_polling"
+}
