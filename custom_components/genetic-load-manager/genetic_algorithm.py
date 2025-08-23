@@ -49,8 +49,8 @@ class GeneticAlgorithm:
         pv_forecast = np.zeros(self.time_slots)
 
         # Fetch today's and tomorrow's Solcast forecasts
-        pv_today_state = await self.hass.states.async_get(self.pv_forecast_entity)
-        pv_tomorrow_state = await self.hass.states.async_get(self.pv_forecast_tomorrow_entity)
+        pv_today_state = self.hass.states.get(self.pv_forecast_entity)
+        pv_tomorrow_state = self.hass.states.get(self.pv_forecast_tomorrow_entity)
         pv_today_raw = pv_today_state.attributes.get("DetailedForecast", []) if pv_today_state else []
         pv_tomorrow_raw = pv_tomorrow_state.attributes.get("DetailedForecast", []) if pv_tomorrow_state else []
 
@@ -100,12 +100,16 @@ class GeneticAlgorithm:
                 return
 
         # Fetch load forecast
-        load_state = await self.hass.states.async_get(self.load_forecast_entity)
+        load_state = self.hass.states.get(self.load_forecast_entity)
         self.load_forecast = np.array([float(x) for x in load_state.attributes.get("forecast", [0.1] * self.time_slots)] if load_state else [0.1] * self.time_slots)
 
         # Fetch battery state and pricing
-        battery_state = await self.hass.states.async_get(self.battery_soc_entity)
-        self.battery_soc = float(battery_state.state) if battery_state else 0.0
+        battery_state = self.hass.states.get(self.battery_soc_entity)
+        try:
+            self.battery_soc = float(battery_state.state) if battery_state and battery_state.state not in ['unknown', 'unavailable'] else 0.0
+        except (ValueError, TypeError):
+            _LOGGER.warning(f"Invalid battery SOC state: {battery_state.state if battery_state else 'None'}, using 0.0")
+            self.battery_soc = 0.0
         
         # Use indexed pricing calculator or fallback to simple pricing
         if self.use_indexed_pricing:
@@ -118,8 +122,13 @@ class GeneticAlgorithm:
         
         if not self.use_indexed_pricing:
             # Fallback to simple dynamic pricing entity
-            pricing_state = await self.hass.states.async_get(self.dynamic_pricing_entity)
+            pricing_state = self.hass.states.get(self.dynamic_pricing_entity)
             self.pricing = np.array([float(x) for x in pricing_state.attributes.get("prices", [0.1] * self.time_slots)] if pricing_state else [0.1] * self.time_slots)
+        
+        # Ensure pricing is initialized even if both methods fail
+        if not hasattr(self, 'pricing') or self.pricing is None:
+            _LOGGER.warning("Both indexed and dynamic pricing failed, using default pricing")
+            self.pricing = np.full(self.time_slots, 0.1)  # Default 0.1 €/kWh
         self.pv_forecast = pv_forecast
         _LOGGER.debug(f"PV forecast (96 slots): {pv_forecast.tolist()}")
 
@@ -262,14 +271,20 @@ class GeneticAlgorithm:
 
     async def rule_based_schedule(self):
         """Generate a rule-based schedule as fallback."""
+        # Ensure forecast data is available
+        if not hasattr(self, 'pv_forecast') or self.pv_forecast is None:
+            await self.fetch_forecast_data()
+        
         # Simple rule-based scheduling based on PV forecast and pricing
         schedule = np.zeros((self.num_devices, self.time_slots))
         
-        for t in range(self.time_slots):
-            # Turn on devices when PV generation is high and prices are low
-            if self.pv_forecast[t] > 0.5 and self.pricing[t] < np.mean(self.pricing):
-                for d in range(self.num_devices):
-                    schedule[d, t] = 1.0
+        # Safety check for forecast data
+        if hasattr(self, 'pv_forecast') and hasattr(self, 'pricing') and self.pv_forecast is not None and self.pricing is not None:
+            for t in range(self.time_slots):
+                # Turn on devices when PV generation is high and prices are low
+                if self.pv_forecast[t] > 0.5 and self.pricing[t] < np.mean(self.pricing):
+                    for d in range(self.num_devices):
+                        schedule[d, t] = 1.0
         
         return schedule
 

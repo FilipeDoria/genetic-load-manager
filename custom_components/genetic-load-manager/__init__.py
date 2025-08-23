@@ -75,6 +75,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_register_services(hass: HomeAssistant):
     """Register custom services."""
     
+    # Check if services are already registered
+    if hass.services.has_service(DOMAIN, "run_optimization"):
+        _LOGGER.debug("Services already registered, skipping")
+        return
+    
     async def handle_run_optimization(call):
         """Handle run_optimization service call."""
         try:
@@ -155,8 +160,9 @@ async def async_register_services(hass: HomeAssistant):
                     schedule = await genetic_algo.rule_based_schedule()
                     
                     # Update device schedule entities
-                    for d in range(schedule.shape[0]):
-                        if schedule.shape[1] > 0:
+                    if schedule is not None and schedule.size > 0:
+                        for d in range(schedule.shape[0]):
+                            if schedule.shape[1] > 0:
                             schedule_value = "on" if schedule[d][0] > 0.5 else "off"
                             entity_id = f"switch.device_{d}_schedule"
                             
