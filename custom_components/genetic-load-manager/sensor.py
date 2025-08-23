@@ -1,8 +1,9 @@
 """Sensor platform for Genetic Load Manager integration."""
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.helpers.typing import DiscoveryInfoType
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
@@ -10,15 +11,18 @@ import numpy as np
 import logging
 
 _LOGGER = logging.getLogger(__name__)
-DOMAIN = "genetic_load_manager"
+from .const import DOMAIN
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigType, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
     """Set up the sensor platform for the genetic load manager."""
     sensors = [LoadForecastSensor(hass, entry.data)]
     
     # Add pricing sensor if indexed pricing is enabled
     if entry.data.get("use_indexed_pricing", True):
         sensors.append(IndexedPricingSensor(hass, entry.data))
+    
+    # Add status sensor
+    sensors.append(GeneticAlgorithmStatusSensor(hass, entry.data))
     
     # Add dashboard sensors
     from .dashboard import OptimizationDashboardSensor, ScheduleVisualizationSensor
@@ -246,3 +250,72 @@ class IndexedPricingSensor(SensorEntity):
             _LOGGER.error(f"Error updating indexed pricing sensor: {e}")
             if self._state is None:
                 self._state = 0.1  # Fallback price
+
+
+class GeneticAlgorithmStatusSensor(SensorEntity):
+    """Sensor entity for genetic algorithm status and metrics."""
+
+    def __init__(self, hass: HomeAssistant, config: dict):
+        """Initialize the genetic algorithm status sensor."""
+        self.hass = hass
+        self._attr_unique_id = f"{DOMAIN}_genetic_algorithm_status"
+        self._attr_name = "Genetic Algorithm Status"
+        self._attr_unit_of_measurement = None
+        self._attr_device_class = None
+        self._state = "idle"
+        self._attributes = {}
+
+    @property
+    def state(self):
+        """Return the current status of the genetic algorithm."""
+        return self._state
+
+    @property
+    def extra_state_attributes(self):
+        """Return detailed status information as attributes."""
+        return self._attributes
+
+    async def async_added_to_hass(self):
+        """Set up the sensor."""
+        await self.async_update()
+
+    async def async_update(self):
+        """Update the sensor status."""
+        try:
+            # Get genetic algorithm instance from hass data
+            genetic_algo = self.hass.data.get(DOMAIN, {}).get('genetic_algorithm')
+            
+            if genetic_algo:
+                # Update status based on genetic algorithm state
+                if hasattr(genetic_algo, 'is_running') and genetic_algo.is_running:
+                    self._state = "running"
+                elif hasattr(genetic_algo, 'is_optimizing') and genetic_algo.is_optimizing:
+                    self._state = "optimizing"
+                else:
+                    self._state = "idle"
+                
+                # Update attributes
+                self._attributes = {
+                    "last_updated": datetime.now().isoformat(),
+                    "population_size": getattr(genetic_algo, 'population_size', 100),
+                    "generations": getattr(genetic_algo, 'generations', 200),
+                    "mutation_rate": getattr(genetic_algo, 'mutation_rate', 0.05),
+                    "crossover_rate": getattr(genetic_algo, 'crossover_rate', 0.8),
+                    "best_fitness": getattr(genetic_algo, 'best_fitness', None),
+                    "current_generation": getattr(genetic_algo, 'best_fitness', None),
+                    "optimization_count": getattr(genetic_algo, 'optimization_count', 0)
+                }
+            else:
+                self._state = "not_initialized"
+                self._attributes = {
+                    "last_updated": datetime.now().isoformat(),
+                    "error": "Genetic algorithm not available"
+                }
+                
+        except Exception as e:
+            _LOGGER.error(f"Error updating genetic algorithm status sensor: {e}")
+            self._state = "error"
+            self._attributes = {
+                "last_updated": datetime.now().isoformat(),
+                "error": str(e)
+            }

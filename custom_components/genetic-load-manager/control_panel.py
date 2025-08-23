@@ -10,7 +10,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.const import STATE_ON, STATE_OFF
 
 _LOGGER = logging.getLogger(__name__)
-DOMAIN = "genetic_load_manager"
+from .const import DOMAIN
 
 class ControlPanelSensor(SensorEntity):
     """Control panel sensor for interactive genetic load management."""

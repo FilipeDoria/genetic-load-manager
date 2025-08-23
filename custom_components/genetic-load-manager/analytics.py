@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.const import CURRENCY_EURO
 
 _LOGGER = logging.getLogger(__name__)
-DOMAIN = "genetic_load_manager"
+from .const import DOMAIN
 
 class CostAnalyticsSensor(SensorEntity):
     """Advanced cost analysis and financial metrics sensor."""
