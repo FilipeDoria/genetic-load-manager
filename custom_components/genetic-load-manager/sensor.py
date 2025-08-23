@@ -4,7 +4,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import DiscoveryInfoType
-from homeassistant.const import ENERGY_KILO_WATT_HOUR
+from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
 import numpy as np
@@ -46,7 +46,7 @@ class LoadForecastSensor(SensorEntity):
         self.hass = hass
         self._attr_unique_id = f"{DOMAIN}_load_forecast"
         self._attr_name = "Load Forecast"
-        self._attr_unit_of_measurement = ENERGY_KILO_WATT_HOUR
+        self._attr_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_device_class = "energy"
         self._load_sensor_entity = config.get("load_sensor_entity")
         self._forecast = []
