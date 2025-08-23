@@ -163,8 +163,8 @@ async def async_register_services(hass: HomeAssistant):
                     if schedule is not None and schedule.size > 0:
                         for d in range(schedule.shape[0]):
                             if schedule.shape[1] > 0:
-                            schedule_value = "on" if schedule[d][0] > 0.5 else "off"
-                            entity_id = f"switch.device_{d}_schedule"
+                                schedule_value = "on" if schedule[d][0] > 0.5 else "off"
+                                entity_id = f"switch.device_{d}_schedule"
                             
                             await hass.states.async_set(
                                 entity_id,
