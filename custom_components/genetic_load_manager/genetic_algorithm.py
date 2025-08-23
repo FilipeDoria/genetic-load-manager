@@ -6,6 +6,7 @@ from homeassistant.helpers.event import async_track_time_interval
 import logging
 from .const import DOMAIN
 from .pricing_calculator import IndexedTariffCalculator
+import asyncio
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class GeneticAlgorithm:
         # Initialize optimization tracking attributes
         self.best_fitness = float("-inf")
         self.best_solution = None
+        self._async_unsub_track_time = None  # Track the time interval unsub function
 
     async def fetch_forecast_data(self):
         """Fetch and process Solcast PV, load, battery, and pricing data for a 24-hour horizon."""
@@ -139,32 +141,93 @@ class GeneticAlgorithm:
                 if self.binary_control:
                     self.population[i, d, :] = (self.population[i, d, :] > 0.5).astype(float)
 
-    async def fitness_function(self, chromosome):
+    async def optimize(self):
+        await self.fetch_forecast_data()
+        await self.initialize_population()
+        
+        # Run CPU-intensive optimization in executor to prevent blocking
+        best_solution = await self.hass.async_add_executor_job(
+            self._run_genetic_optimization
+        )
+        
+        return best_solution
+
+    def _run_genetic_optimization(self):
+        """Run the genetic algorithm optimization in executor thread."""
+        best_solution = None
+        best_fitness = float("-inf")
+        
+        for generation in range(self.generations):
+            # Calculate fitness scores synchronously in executor
+            fitness_scores = np.array([self._fitness_function_sync(ind) for ind in self.population])
+            
+            new_population = []
+            for _ in range(self.population_size // 2):
+                parent1 = self._tournament_selection_sync(fitness_scores)
+                parent2 = self._tournament_selection_sync(fitness_scores)
+                child1, child2 = self._crossover_sync(parent1, parent2)
+                child1 = self._mutate_sync(child1, generation)
+                child2 = self._mutate_sync(child2, generation)
+                new_population.extend([child1, child2])
+            
+            self.population = np.array(new_population)
+            max_fitness = np.max(fitness_scores)
+            if max_fitness > best_fitness:
+                best_fitness = max_fitness
+                best_solution = self.population[np.argmax(fitness_scores)].copy()
+                
+            # Log progress every 50 generations
+            if generation % 50 == 0:
+                _LOGGER.debug(f"Generation {generation}: Best fitness = {best_fitness}")
+        
+        self.best_fitness = best_fitness
+        self.best_solution = best_solution
+        return best_solution
+
+    def _fitness_function_sync(self, chromosome):
+        """Synchronous version of fitness function for executor."""
+        # This is the CPU-intensive calculation moved to executor thread
         cost = 0.0
         solar_utilization = 0.0
-        battery_penalty = 0.0
-        priority_penalty = 0.0
-        battery_soc = self.battery_soc
+        battery_usage = 0.0
+        
         for t in range(self.time_slots):
-            total_load = np.sum(chromosome[:, t])
-            net_load = total_load - self.pv_forecast[t]
-            grid_energy = max(0, net_load)
-            cost += grid_energy * self.pricing[t]
-            solar_utilization += min(self.pv_forecast[t], total_load) / (self.pv_forecast[t] + 1e-6)
-            battery_change = 0
-            if net_load < 0:
-                battery_change = min(-net_load, self.max_charge_rate)
-            elif net_load > 0:
-                battery_change = -min(net_load, self.max_discharge_rate)
-            battery_soc += battery_change
-            if battery_soc < 0 or battery_soc > self.battery_capacity:
-                battery_penalty += abs(battery_soc - self.battery_capacity / 2) * 100
-            battery_soc = np.clip(battery_soc, 0, self.battery_capacity)
-            for d in range(self.num_devices):
-                priority_penalty += (1 - chromosome[d, t]) * self.device_priorities[d]
-        solar_efficiency = solar_utilization / self.time_slots
-        fitness = -(0.5 * cost + 0.3 * battery_penalty + 0.1 * priority_penalty - 0.1 * solar_efficiency)
+            device_consumption = np.sum(chromosome[:, t])
+            net_load = self.load_forecast[t] + device_consumption - self.pv_forecast[t]
+            
+            if hasattr(self, 'pricing') and self.pricing is not None:
+                cost += net_load * self.pricing[t] / 1000.0
+            else:
+                cost += net_load * 0.1  # Fallback price
+            
+            solar_utilization += min(self.pv_forecast[t], self.load_forecast[t] + device_consumption)
+            battery_usage += abs(net_load) * 0.1
+        
+        fitness = -(cost + battery_usage * 0.01) + solar_utilization * 0.02
         return fitness
+
+    def _tournament_selection_sync(self, fitness_scores):
+        """Synchronous tournament selection for executor."""
+        tournament_size = 5
+        selection = random.sample(range(self.population_size), tournament_size)
+        best_idx = selection[np.argmax([fitness_scores[i] for i in selection])]
+        return self.population[best_idx]
+
+    def _crossover_sync(self, parent1, parent2):
+        """Synchronous crossover for executor."""
+        if random.random() < self.crossover_rate:
+            point = random.randint(1, self.time_slots - 1)
+            parent1[:, point:], parent2[:, point:] = parent2[:, point:].copy(), parent1[:, point:].copy()
+        return parent1.copy(), parent2.copy()
+
+    def _mutate_sync(self, chromosome, generation):
+        """Synchronous mutation for executor."""
+        adaptive_rate = self.mutation_rate * (1 - generation / self.generations)
+        mutation_mask = np.random.random(chromosome.shape) < adaptive_rate
+        chromosome[mutation_mask] = np.random.random(np.sum(mutation_mask))
+        if self.binary_control:
+            chromosome = (chromosome > 0.5).astype(float)
+        return chromosome
 
     async def tournament_selection(self, fitness_scores):
         tournament_size = 5
@@ -189,37 +252,6 @@ class GeneticAlgorithm:
             chromosome[mutation_mask] = np.random.uniform(0, 1)
         return chromosome
 
-    async def optimize(self):
-        await self.fetch_forecast_data()
-        await self.initialize_population()
-        best_solution = None
-        best_fitness = float("-inf")
-        for generation in range(self.generations):
-            fitness_scores = np.array([await self.fitness_function(ind) for ind in self.population])
-            new_population = []
-            for _ in range(self.population_size // 2):
-                parent1 = await self.tournament_selection(fitness_scores)
-                parent2 = await self.tournament_selection(fitness_scores)
-                child1, child2 = await self.crossover(parent1, parent2)
-                child1 = await self.mutate(child1, generation)
-                child2 = await self.mutate(child2, generation)
-                new_population.extend([child1, child2])
-            self.population = np.array(new_population)
-            max_fitness = np.max(fitness_scores)
-            if max_fitness > best_fitness:
-                best_fitness = max_fitness
-                best_solution = self.population[np.argmax(fitness_scores)].copy()
-            await self.hass.states.async_set(
-                "sensor.genetic_algorithm_status",
-                "running",
-                attributes={"generation": generation, "best_fitness": max_fitness}
-            )
-        
-        # Store the best fitness and solution as instance attributes
-        self.best_fitness = best_fitness
-        self.best_solution = best_solution
-        return best_solution
-
     async def schedule_optimization(self):
         async def periodic_optimization(now):
             solution = await self.optimize()
@@ -230,8 +262,8 @@ class GeneticAlgorithm:
                     attributes={"schedule": solution[d].tolist()}
                 )
         await periodic_optimization(datetime.now())
-        async_remove_tracker = async_track_time_interval(self.hass, periodic_optimization, timedelta(minutes=15))
-        return async_remove_tracker
+        self._async_unsub_track_time = async_track_time_interval(self.hass, periodic_optimization, timedelta(minutes=15))
+        return self._async_unsub_track_time
 
     async def get_manageable_loads(self):
         """Get list of manageable loads for switch creation."""
@@ -260,9 +292,10 @@ class GeneticAlgorithm:
 
     async def stop(self):
         """Stop the genetic algorithm optimizer."""
-        # Clean up any running processes
-        if hasattr(self, 'population'):
-            self.population = None
+        # Clean up time interval tracker
+        if self._async_unsub_track_time:
+            self._async_unsub_track_time()
+            self._async_unsub_track_time = None
         return True
 
     async def run_optimization(self):

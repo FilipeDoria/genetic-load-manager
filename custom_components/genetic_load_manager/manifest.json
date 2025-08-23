@@ -5,7 +5,7 @@
   "documentation": "https://github.com/filipe0doria/genetic-load-manager",
   "issue_tracker": "https://github.com/filipe0doria/genetic-load-manager/issues",
   "dependencies": ["sensor", "binary_sensor", "switch", "recorder"],
-  "requirements": ["numpy"],
+  "requirements": ["numpy>=1.21.0,<2.0.0"],
   "codeowners": ["@filipe0doria"],
   "iot_class": "local_polling",
   "config_flow": true,

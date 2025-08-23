@@ -48,9 +48,10 @@ class LoadForecastSensor(SensorEntity):
         self._attr_name = "Load Forecast"
         self._attr_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_device_class = "energy"
-        self._load_sensor_entity = config.get("load_sensor_entity")
-        self._forecast = []
         self._state = None
+        self._attributes = {}
+        self.load_sensor_entity = config.get("load_sensor_entity")
+        self._async_unsub_track_time = None  # Track the time interval unsub function
 
     @property
     def state(self):
@@ -64,12 +65,20 @@ class LoadForecastSensor(SensorEntity):
 
     async def async_added_to_hass(self):
         """Set up periodic updates for the sensor."""
-        async_track_time_interval(self.hass, self.async_update, timedelta(minutes=15))
+        self._async_unsub_track_time = async_track_time_interval(
+            self.hass, self.async_update, timedelta(minutes=15)
+        )
         await self.async_update()
+
+    async def async_will_remove_from_hass(self):
+        """Clean up when removing entity."""
+        if self._async_unsub_track_time:
+            self._async_unsub_track_time()
+            self._async_unsub_track_time = None
 
     async def async_update(self):
         """Update the sensor with a new 24-hour load forecast based on last 24 hours of data."""
-        if not self._load_sensor_entity:
+        if not self.load_sensor_entity:
             _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
             self._forecast = [0.0] * 96
             self._state = 0.0
@@ -99,13 +108,13 @@ class LoadForecastSensor(SensorEntity):
                 self.hass,
                 start_time,
                 end_time,
-                [self._load_sensor_entity],
+                [self.load_sensor_entity],
                 None,  # end_time_param
                 True   # significant_changes_only
             )
-            return history.get(self._load_sensor_entity, [])
+            return history.get(self.load_sensor_entity, [])
         except Exception as e:
-            _LOGGER.error(f"Error fetching last 24h data for {self._load_sensor_entity}: {e}")
+            _LOGGER.error(f"Error fetching last 24h data for {self.load_sensor_entity}: {e}")
             return []
 
     async def _generate_forecast_from_last_24h(self, history):
