@@ -23,15 +23,21 @@ from .const import (
     CONF_BINARY_CONTROL,
     CONF_USE_INDEXED_PRICING,
     CONF_OPTIMIZATION_MODE,
-    CONF_PV_FORECAST_ENTITY,
-    CONF_LOAD_FORECAST_ENTITY,
-    CONF_BATTERY_SOC_ENTITY,
-    CONF_GRID_IMPORT_ENTITY,
-    CONF_GRID_EXPORT_ENTITY,
-    CONF_SOLAR_POWER_ENTITY,
-    CONF_ELECTRICITY_PRICE_ENTITY,
-    CONF_WEATHER_ENTITY,
-    CONF_DEVICE_ENTITIES,
+    CONF_PV_FORECAST_TODAY,
+    CONF_PV_FORECAST_TOMORROW,
+    CONF_LOAD_FORECAST,
+    CONF_LOAD_SENSOR,
+    CONF_BATTERY_SOC,
+    CONF_MARKET_PRICE,
+    CONF_GRID_POWER,
+    CONF_DEMAND_RESPONSE,
+    CONF_CARBON_INTENSITY,
+    CONF_WEATHER,
+    CONF_EV_CHARGER,
+    CONF_SMART_THERMOSTAT,
+    CONF_SMART_PLUG,
+    CONF_LIGHTING,
+    CONF_MEDIA_PLAYER,
     CONF_UPDATE_INTERVAL,
     DEFAULT_POPULATION_SIZE,
     DEFAULT_GENERATIONS,
@@ -45,6 +51,7 @@ from .const import (
     DEFAULT_USE_INDEXED_PRICING,
     DEFAULT_OPTIMIZATION_MODE,
     DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_ENTITIES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -254,51 +261,133 @@ class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="entity_mapping",
             data_schema=vol.Schema({
-                vol.Optional(CONF_PV_FORECAST_ENTITY): selector.EntitySelector(
+                vol.Optional(
+                    CONF_PV_FORECAST_TODAY,
+                    default=DEFAULT_ENTITIES["pv_forecast_today"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        # More flexible selector for detailed forecast entities
+                        integration="solcast"
+                    )
+                ),
+                vol.Optional(
+                    CONF_PV_FORECAST_TOMORROW,
+                    default=DEFAULT_ENTITIES["pv_forecast_tomorrow"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        # More flexible selector for detailed forecast entities
+                        integration="solcast"
+                    )
+                ),
+                vol.Optional(
+                    CONF_LOAD_FORECAST,
+                    default=DEFAULT_ENTITIES["load_forecast"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        # Allow any sensor for load forecast
+                    )
+                ),
+                vol.Optional(
+                    CONF_LOAD_SENSOR,
+                    default=DEFAULT_ENTITIES["load_sensor"]
+                ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="sensor",
                         device_class="power"
                     )
                 ),
-                vol.Optional(CONF_LOAD_FORECAST_ENTITY): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="power"
-                    )
-                ),
-                vol.Optional(CONF_BATTERY_SOC_ENTITY): selector.EntitySelector(
+                vol.Optional(
+                    CONF_BATTERY_SOC,
+                    default=DEFAULT_ENTITIES["battery_soc"]
+                ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="sensor",
                         device_class="battery"
                     )
                 ),
-                vol.Optional(CONF_GRID_IMPORT_ENTITY): selector.EntitySelector(
+                vol.Optional(
+                    CONF_MARKET_PRICE,
+                    default=DEFAULT_ENTITIES["market_price"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor",
+                        # Allow any sensor for market price
+                    )
+                ),
+                vol.Optional(
+                    CONF_GRID_POWER,
+                    default=DEFAULT_ENTITIES["grid_power"]
+                ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="sensor",
                         device_class="power"
                     )
                 ),
-                vol.Optional(CONF_GRID_EXPORT_ENTITY): selector.EntitySelector(
+                vol.Optional(
+                    CONF_DEMAND_RESPONSE,
+                    default=DEFAULT_ENTITIES["demand_response"]
+                ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="power"
+                        domain="binary_sensor"
                     )
                 ),
-                vol.Optional(CONF_SOLAR_POWER_ENTITY): selector.EntitySelector(
+                vol.Optional(
+                    CONF_CARBON_INTENSITY,
+                    default=DEFAULT_ENTITIES["carbon_intensity"]
+                ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="power"
+                        domain="sensor"
                     )
                 ),
-                vol.Optional(CONF_ELECTRICITY_PRICE_ENTITY): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="monetary"
-                    )
-                ),
-                vol.Optional(CONF_WEATHER_ENTITY): selector.EntitySelector(
+                vol.Optional(
+                    CONF_WEATHER,
+                    default=DEFAULT_ENTITIES["weather"]
+                ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="weather"
+                    )
+                ),
+                vol.Optional(
+                    CONF_EV_CHARGER,
+                    default=DEFAULT_ENTITIES["ev_charger"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="switch"
+                    )
+                ),
+                vol.Optional(
+                    CONF_SMART_THERMOSTAT,
+                    default=DEFAULT_ENTITIES["smart_thermostat"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="climate"
+                    )
+                ),
+                vol.Optional(
+                    CONF_SMART_PLUG,
+                    default=DEFAULT_ENTITIES["smart_plug"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="switch"
+                    )
+                ),
+                vol.Optional(
+                    CONF_LIGHTING,
+                    default=DEFAULT_ENTITIES["lighting"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="light"
+                    )
+                ),
+                vol.Optional(
+                    CONF_MEDIA_PLAYER,
+                    default=DEFAULT_ENTITIES["media_player"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="media_player"
                     )
                 ),
             }),
@@ -337,9 +426,10 @@ class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Validate the entity mapping."""
         # Check if at least some entities are configured
         required_entities = [
-            CONF_PV_FORECAST_ENTITY,
-            CONF_LOAD_FORECAST_ENTITY,
-            CONF_BATTERY_SOC_ENTITY
+            CONF_PV_FORECAST_TODAY,
+            CONF_PV_FORECAST_TOMORROW,
+            CONF_LOAD_FORECAST,
+            CONF_BATTERY_SOC
         ]
         
         if not any(user_input.get(entity) for entity in required_entities):

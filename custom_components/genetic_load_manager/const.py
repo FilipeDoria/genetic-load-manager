@@ -24,7 +24,7 @@ CONF_LOAD_FORECAST = "load_forecast"
 CONF_LOAD_SENSOR = "load_sensor"
 CONF_BATTERY_SOC = "battery_soc"
 CONF_MARKET_PRICE = "market_price"
-CONF_GRID_EXPORT_LIMIT = "grid_export_limit"
+CONF_GRID_POWER = "grid_power"
 CONF_DEMAND_RESPONSE = "demand_response"
 CONF_CARBON_INTENSITY = "carbon_intensity"
 CONF_WEATHER = "weather"
@@ -83,7 +83,7 @@ DEFAULT_ENTITIES = {
     "load_sensor": "sensor.power_consumption",
     "battery_soc": "sensor.battery_soc",
     "market_price": "sensor.omie_spot_price_pt",
-    "grid_export_limit": "sensor.grid_export_limit",
+    "grid_power": "sensor.grid_power",
     "demand_response": "binary_sensor.demand_response_active",
     "carbon_intensity": "sensor.carbon_intensity",
     "weather": "weather.home",

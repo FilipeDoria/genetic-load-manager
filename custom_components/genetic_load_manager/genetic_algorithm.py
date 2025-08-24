@@ -6,7 +6,7 @@ from homeassistant.helpers.event import async_track_time_interval
 import logging
 from .const import (
     DOMAIN, CONF_OPTIMIZATION_MODE, CONF_UPDATE_INTERVAL, CONF_PV_FORECAST_TODAY,
-    CONF_PV_FORECAST_TOMORROW, CONF_LOAD_FORECAST, CONF_BATTERY_SOC, CONF_GRID_EXPORT_LIMIT,
+    CONF_PV_FORECAST_TOMORROW, CONF_LOAD_FORECAST, CONF_BATTERY_SOC, CONF_GRID_POWER,
     CONF_DEMAND_RESPONSE, CONF_CARBON_INTENSITY, CONF_WEATHER, CONF_EV_CHARGER,
     CONF_SMART_THERMOSTAT, CONF_SMART_PLUG, CONF_LIGHTING, CONF_MEDIA_PLAYER,
     DEFAULT_OPTIMIZATION_MODE, DEFAULT_UPDATE_INTERVAL, DEFAULT_ENTITIES
@@ -31,7 +31,7 @@ class GeneticLoadOptimizer:
         self.pv_forecast_tomorrow_entity = config.get(CONF_PV_FORECAST_TOMORROW, DEFAULT_ENTITIES["pv_forecast_tomorrow"])
         self.load_forecast_entity = config.get(CONF_LOAD_FORECAST, DEFAULT_ENTITIES["load_forecast"])
         self.battery_soc_entity = config.get(CONF_BATTERY_SOC, DEFAULT_ENTITIES["battery_soc"])
-        self.grid_export_limit_entity = config.get(CONF_GRID_EXPORT_LIMIT, DEFAULT_ENTITIES["grid_export_limit"])
+        self.grid_power_entity = config.get(CONF_GRID_POWER, DEFAULT_ENTITIES["grid_power"])
         self.demand_response_entity = config.get(CONF_DEMAND_RESPONSE, DEFAULT_ENTITIES["demand_response"])
         self.carbon_intensity_entity = config.get(CONF_CARBON_INTENSITY, DEFAULT_ENTITIES["carbon_intensity"])
         self.weather_entity = config.get(CONF_WEATHER, DEFAULT_ENTITIES["weather"])
