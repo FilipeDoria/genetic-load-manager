@@ -4,7 +4,13 @@ from datetime import datetime, timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 import logging
-from .const import DOMAIN
+from .const import (
+    DOMAIN, CONF_OPTIMIZATION_MODE, CONF_UPDATE_INTERVAL, CONF_PV_FORECAST_TODAY,
+    CONF_PV_FORECAST_TOMORROW, CONF_LOAD_FORECAST, CONF_BATTERY_SOC, CONF_GRID_EXPORT_LIMIT,
+    CONF_DEMAND_RESPONSE, CONF_CARBON_INTENSITY, CONF_WEATHER, CONF_EV_CHARGER,
+    CONF_SMART_THERMOSTAT, CONF_SMART_PLUG, CONF_LIGHTING, CONF_MEDIA_PLAYER,
+    DEFAULT_OPTIMIZATION_MODE, DEFAULT_UPDATE_INTERVAL, DEFAULT_ENTITIES
+)
 from .pricing_calculator import IndexedTariffCalculator
 import asyncio
 
@@ -12,20 +18,35 @@ _LOGGER = logging.getLogger(__name__)
 
 class GeneticLoadOptimizer:
     def __init__(self, hass: HomeAssistant, config: dict):
+        """Initialize the genetic algorithm optimizer."""
         self.hass = hass
+        self.config = config
+        
+        # Load configuration with defaults
+        self.optimization_mode = config.get(CONF_OPTIMIZATION_MODE, DEFAULT_OPTIMIZATION_MODE)
+        self.update_interval = config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+        
+        # Entity configuration with fallbacks to defaults
+        self.pv_forecast_today_entity = config.get(CONF_PV_FORECAST_TODAY, DEFAULT_ENTITIES["pv_forecast_today"])
+        self.pv_forecast_tomorrow_entity = config.get(CONF_PV_FORECAST_TOMORROW, DEFAULT_ENTITIES["pv_forecast_tomorrow"])
+        self.load_forecast_entity = config.get(CONF_LOAD_FORECAST, DEFAULT_ENTITIES["load_forecast"])
+        self.battery_soc_entity = config.get(CONF_BATTERY_SOC, DEFAULT_ENTITIES["battery_soc"])
+        self.grid_export_limit_entity = config.get(CONF_GRID_EXPORT_LIMIT, DEFAULT_ENTITIES["grid_export_limit"])
+        self.demand_response_entity = config.get(CONF_DEMAND_RESPONSE, DEFAULT_ENTITIES["demand_response"])
+        self.carbon_intensity_entity = config.get(CONF_CARBON_INTENSITY, DEFAULT_ENTITIES["carbon_intensity"])
+        self.weather_entity = config.get(CONF_WEATHER, DEFAULT_ENTITIES["weather"])
+        self.ev_charger_entity = config.get(CONF_EV_CHARGER, DEFAULT_ENTITIES["ev_charger"])
+        self.smart_thermostat_entity = config.get(CONF_SMART_THERMOSTAT, DEFAULT_ENTITIES["smart_thermostat"])
+        self.smart_plug_entity = config.get(CONF_SMART_PLUG, DEFAULT_ENTITIES["smart_plug"])
+        self.lighting_entity = config.get(CONF_LIGHTING, DEFAULT_ENTITIES["lighting"])
+        self.media_player_entity = config.get(CONF_MEDIA_PLAYER, DEFAULT_ENTITIES["media_player"])
+
         self.population_size = config.get("population_size", 100)
         self.generations = config.get("generations", 200)
         self.mutation_rate = config.get("mutation_rate", 0.05)
         self.crossover_rate = config.get("crossover_rate", 0.8)
         self.num_devices = config.get("num_devices", 2)
         self.time_slots = 96
-        self.pv_forecast_entity = config.get("pv_forecast_entity")
-        self.pv_forecast_tomorrow_entity = config.get("pv_forecast_tomorrow_entity")
-        self.load_forecast_entity = config.get("load_forecast_entity")
-        self.battery_soc_entity = config.get("battery_soc_entity")
-        self.dynamic_pricing_entity = config.get("dynamic_pricing_entity")
-        self.device_priorities = config.get("device_priorities", [1.0] * self.num_devices)
-        self.population = None
         self.pv_forecast = None
         self.load_forecast = None
         self.battery_capacity = config.get("battery_capacity", 10.0)
@@ -55,10 +76,10 @@ class GeneticLoadOptimizer:
         pv_today_state = None
         pv_tomorrow_state = None
         
-        if self.pv_forecast_entity:
-            pv_today_state = self.hass.states.get(self.pv_forecast_entity)
+        if self.pv_forecast_today_entity:
+            pv_today_state = self.hass.states.get(self.pv_forecast_today_entity)
             if not pv_today_state:
-                _LOGGER.warning(f"PV forecast entity not found: {self.pv_forecast_entity}")
+                _LOGGER.warning(f"PV forecast entity not found: {self.pv_forecast_today_entity}")
         else:
             _LOGGER.warning("No PV forecast entity configured")
             

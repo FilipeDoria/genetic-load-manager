@@ -5,6 +5,14 @@ from typing import Dict, Any, Optional, List
 
 from homeassistant.core import HomeAssistant
 
+from .const import (
+    DOMAIN, CONF_MARKET_PRICE, CONF_FIXED_PERCENTAGE, CONF_QUALITY_COMPONENT,
+    CONF_TRANSMISSION_TARIFF, CONF_MFRR, CONF_VAT, CONF_CURRENCY_CONVERSION,
+    CONF_PEAK_HOURS, CONF_OFF_PEAK_HOURS, CONF_PEAK_MULTIPLIER, CONF_OFF_PEAK_MULTIPLIER,
+    CONF_SHOULDER_MULTIPLIER, CONF_SUMMER_MONTHS, CONF_SUMMER_ADJUSTMENT,
+    CONF_WINTER_ADJUSTMENT, DEFAULT_ENTITIES
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 class IndexedTariffCalculator:
@@ -14,8 +22,11 @@ class IndexedTariffCalculator:
         """Initialize the pricing calculator."""
         self.hass = hass
         
-        # Market price entity (e.g., OMIE spot price)
-        self.market_price_entity = config.get("market_price_entity")
+        # Use configured entity or default
+        self.market_price_entity = config.get(CONF_MARKET_PRICE, DEFAULT_ENTITIES["market_price"])
+        
+        # Track if we've shown the warning
+        self._warning_shown = False
         
         # Fixed tariff components (in €/MWh or local currency)
         self.mfrr = config.get("mfrr", 1.94)  # Frequency Restoration Reserve
@@ -49,7 +60,9 @@ class IndexedTariffCalculator:
     async def get_current_market_price(self) -> float:
         """Get current market price from configured entity."""
         if not self.market_price_entity:
-            _LOGGER.warning("No market price entity configured, using default")
+            if not self._warning_shown:
+                _LOGGER.warning("No market price entity configured, using default price")
+                self._warning_shown = True
             return 50.0  # Default fallback price in €/MWh
             
         try:
@@ -57,7 +70,9 @@ class IndexedTariffCalculator:
             if state and state.state not in ['unknown', 'unavailable']:
                 return float(state.state)
             else:
-                _LOGGER.warning(f"Market price entity {self.market_price_entity} unavailable")
+                if not self._warning_shown:
+                    _LOGGER.warning(f"Market price entity {self.market_price_entity} unavailable, using default")
+                    self._warning_shown = True
                 return 50.0
         except (ValueError, TypeError) as e:
             _LOGGER.error(f"Error getting market price: {e}")

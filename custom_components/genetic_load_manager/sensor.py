@@ -11,7 +11,12 @@ from datetime import datetime, timedelta
 import logging
 
 _LOGGER = logging.getLogger(__name__)
-from .const import DOMAIN
+from .const import (
+    DOMAIN, CONF_LOAD_SENSOR, CONF_PV_FORECAST_TODAY, CONF_PV_FORECAST_TOMORROW,
+    CONF_LOAD_FORECAST, CONF_BATTERY_SOC, CONF_GRID_EXPORT_LIMIT, CONF_DEMAND_RESPONSE,
+    CONF_CARBON_INTENSITY, CONF_WEATHER, CONF_EV_CHARGER, CONF_SMART_THERMOSTAT,
+    CONF_SMART_PLUG, CONF_LIGHTING, CONF_MEDIA_PLAYER, DEFAULT_ENTITIES
+)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
     """Set up the sensor platform for the genetic load manager."""
@@ -39,19 +44,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(sensors)
 
 class LoadForecastSensor(SensorEntity):
-    """Sensor entity for generating a 24-hour load forecast in 15-minute intervals based on last 24 hours of data."""
+    """Sensor entity for 24-hour load forecasting."""
 
     def __init__(self, hass: HomeAssistant, config: dict):
         """Initialize the load forecast sensor."""
         self.hass = hass
         self._attr_unique_id = f"{DOMAIN}_load_forecast"
         self._attr_name = "Load Forecast"
-        self._attr_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_unit_of_measurement = "kWh"
         self._attr_device_class = "energy"
-        self._state = None
-        self._attributes = {}
-        self.load_sensor_entity = config.get("load_sensor_entity")
-        self._async_unsub_track_time = None  # Track the time interval unsub function
+        self._attr_state_class = "measurement"
+        self._async_unsub_track_time = None
+        
+        # Use configured entity or default
+        self.load_sensor_entity = config.get(CONF_LOAD_SENSOR, DEFAULT_ENTITIES["load_sensor"])
+        
+        # Initialize with default values to avoid warnings
+        self._forecast = [0.1] * 96  # 96 x 15-minute slots
+        self._state = 9.6  # Total energy in kWh (96 * 0.1)
+        
+        # Track if we've shown the warning
+        self._warning_shown = False
 
     @property
     def state(self):
@@ -79,22 +92,26 @@ class LoadForecastSensor(SensorEntity):
     async def async_update(self):
         """Update the sensor with a new 24-hour load forecast based on last 24 hours of data."""
         if not self.load_sensor_entity:
-            _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
-            self._forecast = [0.0] * 96
-            self._state = 0.0
+            if not self._warning_shown:
+                _LOGGER.warning("No load sensor entity specified, setting forecast to defaults")
+                self._warning_shown = True
+            self._forecast = [0.1] * 96
+            self._state = 9.6
             return
 
         # Fetch last 24 hours of historical data
         history = await self._get_last_24h_data()
         if not history:
-            _LOGGER.warning("No historical data available for last 24 hours, setting forecast to defaults")
-            self._forecast = [0.1] * 96  # Default to small non-zero values
-            self._state = 9.6  # 96 * 0.1 kWh
+            if not self._warning_shown:
+                _LOGGER.warning("No historical data available for last 24 hours, setting forecast to defaults")
+                self._warning_shown = True
+            self._forecast = [0.1] * 96
+            self._state = 9.6
             return
 
         # Generate forecast based on last 24 hours
         self._forecast = await self._generate_forecast_from_last_24h(history)
-        self._state = round(sum(self._forecast), 2)  # Total energy in kWh
+        self._state = round(sum(self._forecast), 2)
 
     async def _get_last_24h_data(self):
         """Fetch historical load data for the last 24 hours."""
@@ -330,3 +347,50 @@ class GeneticAlgorithmStatusSensor(SensorEntity):
                 "last_updated": datetime.now().isoformat(),
                 "error": str(e)
             }
+
+class ScheduleVisualizationSensor(SensorEntity):
+    """Sensor entity for genetic algorithm schedule visualization."""
+
+    def __init__(self, hass: HomeAssistant, config: dict):
+        """Initialize the schedule visualization sensor."""
+        self.hass = hass
+        self._attr_unique_id = f"{DOMAIN}_schedule_visualization"
+        self._attr_name = "Schedule Visualization"
+        self._attr_unit_of_measurement = None
+        self._attr_device_class = None
+        self._attr_state_class = None
+        self._state = "No schedule available"
+        self._schedule_data = {}
+        self._last_update = None
+
+    @property
+    def extra_state_attributes(self):
+        """Return schedule visualization data as attributes."""
+        # Limit attribute size to avoid database warnings
+        attrs = {
+            "last_updated": self._last_update.isoformat() if self._last_update else None,
+            "schedule_summary": self._get_schedule_summary(),
+            "optimization_status": self._state
+        }
+        
+        # Only include detailed data if it's small enough
+        if len(str(self._schedule_data)) < 8000:  # Conservative limit
+            attrs["detailed_schedule"] = self._schedule_data
+        else:
+            attrs["detailed_schedule"] = "Data too large for attributes (see logs for details)"
+            _LOGGER.debug(f"Schedule data size: {len(str(self._schedule_data))} characters")
+        
+        return attrs
+
+    def _get_schedule_summary(self):
+        """Get a summary of the schedule to keep attributes small."""
+        if not self._schedule_data:
+            return "No schedule data available"
+        
+        summary = {
+            "total_devices": len(self._schedule_data.get("devices", [])),
+            "time_slots": len(self._schedule_data.get("time_slots", [])),
+            "total_energy": sum(self._schedule_data.get("energy_consumption", [0])),
+            "cost_estimate": self._schedule_data.get("cost_estimate", 0)
+        }
+        return summary

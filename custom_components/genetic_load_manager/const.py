@@ -42,6 +42,34 @@ DEFAULT_USE_INDEXED_PRICING = True
 DEFAULT_OPTIMIZATION_MODE = "cost_savings"
 DEFAULT_UPDATE_INTERVAL = 15
 
+# Default entity IDs to avoid warnings
+DEFAULT_ENTITIES = {
+    "pv_forecast_today": "sensor.solcast_pv_forecast_today",
+    "pv_forecast_tomorrow": "sensor.solcast_pv_forecast_tomorrow",
+    "load_forecast": "sensor.load_forecast",
+    "load_sensor": "sensor.power_consumption",
+    "battery_soc": "sensor.battery_soc",
+    "market_price": "sensor.omie_electricity_price",
+    "grid_export_limit": "sensor.grid_export_limit",
+    "demand_response": "binary_sensor.demand_response_active",
+    "carbon_intensity": "sensor.carbon_intensity",
+    "weather": "weather.home",
+    "ev_charger": "switch.ev_charger",
+    "smart_thermostat": "climate.home_thermostat",
+    "smart_plug": "switch.smart_plug",
+    "lighting": "light.living_room",
+    "media_player": "media_player.tv"
+}
+
+# Entity validation patterns
+ENTITY_PATTERNS = {
+    "pv_forecast": ["sensor.solcast_", "sensor.pv_forecast_", "sensor.solar_forecast_"],
+    "load_forecast": ["sensor.load_forecast", "sensor.power_forecast", "sensor.energy_forecast"],
+    "battery": ["sensor.battery_", "sensor.energy_storage_", "sensor.powerwall_"],
+    "market_price": ["sensor.omie_", "sensor.electricity_price_", "sensor.energy_price_"],
+    "weather": ["weather.", "sensor.temperature_", "sensor.humidity_"]
+}
+
 # Optimization modes
 OPTIMIZATION_MODES = [
     "cost_savings",

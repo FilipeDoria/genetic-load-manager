@@ -1,0 +1,379 @@
+# Genetic Load Manager - Entity Setup Examples
+# Copy these configurations to your configuration.yaml file
+
+# 1. PV Forecast Sensors (Solar Generation)
+sensor:
+  # Solcast PV Forecast Today
+  - platform: template
+    sensors:
+      solcast_pv_forecast_today:
+        friendly_name: "Solcast PV Forecast Today"
+        value_template: "{{ state_attr('sensor.solcast_pv_forecast_today', 'total_energy', 0) | float }}"
+        unit_of_measurement: "kWh"
+        attributes:
+          DetailedForecast: "{{ state_attr('sensor.solcast_pv_forecast_today', 'DetailedForecast', []) }}"
+          last_updated: "{{ now().isoformat() }}"
+  
+  # Solcast PV Forecast Tomorrow  
+  - platform: template
+    sensors:
+      solcast_pv_forecast_tomorrow:
+        friendly_name: "Solcast PV Forecast Tomorrow"
+        value_template: "{{ state_attr('sensor.solcast_pv_forecast_tomorrow', 'total_energy', 0) | float }}"
+        unit_of_measurement: "kWh"
+        attributes:
+          DetailedForecast: "{{ state_attr('sensor.solcast_pv_forecast_tomorrow', 'DetailedForecast', []) }}"
+          last_updated: "{{ now().isoformat() }}"
+
+  # Load Forecast Sensor
+  - platform: template
+    sensors:
+      load_forecast:
+        friendly_name: "Load Forecast"
+        value_template: "{{ states('sensor.power_consumption') | float * 0.25 }}"
+        unit_of_measurement: "kWh"
+        attributes:
+          forecast: "{{ [0.5] * 96 }}"  # 96 x 15-minute slots
+          last_updated: "{{ now().isoformat() }}"
+
+  # Battery State of Charge
+  - platform: template
+    sensors:
+      battery_soc:
+        friendly_name: "Battery State of Charge"
+        value_template: "{{ states('sensor.powerwall_charge') | default(50) }}"
+        unit_of_measurement: "%"
+        attributes:
+          last_updated: "{{ now().isoformat() }}"
+
+  # Market Price Sensor
+  - platform: rest
+    name: "OMIE Electricity Price"
+    resource: "https://api.omie.es/electricity/price"
+    value_template: "{{ value_json.price | default(50) }}"
+    unit_of_measurement: "€/MWh"
+    scan_interval: 300  # 5 minutes
+    headers:
+      User-Agent: "Home Assistant Genetic Load Manager"
+
+  # Grid Export Limit
+  - platform: template
+    sensors:
+      grid_export_limit:
+        friendly_name: "Grid Export Limit"
+        value_template: "{{ 5.0 }}"  # 5 kW limit
+        unit_of_measurement: "kW"
+        attributes:
+          last_updated: "{{ now().isoformat() }}"
+
+  # Carbon Intensity
+  - platform: template
+    sensors:
+      carbon_intensity:
+        friendly_name: "Carbon Intensity"
+        value_template: "{{ 200 }}"  # gCO2/kWh
+        unit_of_measurement: "gCO2/kWh"
+        attributes:
+          last_updated: "{{ now().isoformat() }}"
+
+# 2. Binary Sensors
+binary_sensor:
+  # Demand Response Signal
+  - platform: template
+    binary_sensors:
+      demand_response_active:
+        friendly_name: "Demand Response Active"
+        value_template: "{{ false }}"
+        attributes:
+          last_updated: "{{ now().isoformat() }}"
+
+# 3. Switches (Controllable Loads)
+switch:
+  # EV Charger
+  - platform: template
+    switches:
+      ev_charger:
+        friendly_name: "EV Charger"
+        value_template: "{{ states('switch.ev_charger_actual') | default('off') }}"
+        turn_on:
+          service: switch.turn_on
+          target:
+            entity_id: switch.ev_charger_actual
+        turn_off:
+          service: switch.turn_off
+          target:
+            entity_id: switch.ev_charger_actual
+        attributes:
+          power_consumption: "{{ 7.0 }}"  # 7 kW
+          priority: "{{ 1 }}"
+
+  # Smart Plug
+  - platform: template
+    switches:
+      smart_plug:
+        friendly_name: "Smart Plug"
+        value_template: "{{ states('switch.smart_plug_actual') | default('off') }}"
+        turn_on:
+          service: switch.turn_on
+          target:
+            entity_id: switch.smart_plug_actual
+        turn_off:
+          service: switch.turn_off
+          target:
+            entity_id: switch.smart_plug_actual
+        attributes:
+          power_consumption: "{{ 2.0 }}"  # 2 kW
+          priority: "{{ 2 }}"
+
+# 4. Climate (Smart Thermostat)
+climate:
+  # Smart Thermostat
+  - platform: template
+    thermostats:
+      home_thermostat:
+        friendly_name: "Home Thermostat"
+        value_template: "{{ states('climate.home_thermostat_actual') | default('heat') }}"
+        current_temperature_template: "{{ states('sensor.living_room_temperature') | float }}"
+        target_temperature_template: "{{ state_attr('climate.home_thermostat_actual', 'temperature') | float }}"
+        hvac_mode_template: "{{ states('climate.home_thermostat_actual') | default('heat') }}"
+        set_temperature:
+          service: climate.set_temperature
+          target:
+            entity_id: climate.home_thermostat_actual
+          data:
+            temperature: "{{ temperature }}"
+        set_hvac_mode:
+          service: climate.set_hvac_mode
+          target:
+            entity_id: climate.home_thermostat_actual
+          data:
+            hvac_mode: "{{ hvac_mode }}"
+        attributes:
+          power_consumption: "{{ 3.0 }}"  # 3 kW
+          priority: "{{ 3 }}"
+
+# 5. Lights
+light:
+  # Living Room Light
+  - platform: template
+    lights:
+      living_room:
+        friendly_name: "Living Room Light"
+        value_template: "{{ states('light.living_room_actual') | default('off') }}"
+        turn_on:
+          service: light.turn_on
+          target:
+            entity_id: light.living_room_actual
+        turn_off:
+          service: light.turn_off
+          target:
+            entity_id: light.living_room_actual
+        set_level:
+          service: light.turn_on
+          target:
+            entity_id: light.living_room_actual
+          data:
+            brightness_pct: "{{ brightness }}"
+        attributes:
+          power_consumption: "{{ 0.1 }}"  # 0.1 kW
+          priority: "{{ 4 }}"
+
+# 6. Media Players
+media_player:
+  # TV
+  - platform: template
+    media_players:
+      tv:
+        friendly_name: "TV"
+        value_template: "{{ states('media_player.tv_actual') | default('off') }}"
+        turn_on:
+          service: media_player.turn_on
+          target:
+            entity_id: media_player.tv_actual
+        turn_off:
+          service: media_player.turn_off
+          target:
+            entity_id: media_player.tv_actual
+        attributes:
+          power_consumption: "{{ 0.2 }}"  # 0.2 kW
+          priority: "{{ 5 }}"
+
+# 7. Weather
+weather:
+  # Home Weather
+  - platform: template
+    name: "Home Weather"
+    condition_template: "{{ states('weather.openweathermap') | default('sunny') }}"
+    temperature_template: "{{ states('sensor.outdoor_temperature') | float }}"
+    humidity_template: "{{ states('sensor.outdoor_humidity') | float }}"
+    pressure_template: "{{ states('sensor.outdoor_pressure') | float }}"
+    wind_speed_template: "{{ states('sensor.outdoor_wind_speed') | float }}"
+    forecast_template: "{{ state_attr('weather.openweathermap', 'forecast') | default([]) }}"
+
+# 8. Input Numbers (User Preferences)
+input_number:
+  # Optimization Mode
+  optimization_mode:
+    name: "Optimization Mode"
+    min: 1
+    max: 3
+    step: 1
+    initial: 1
+    mode: slider
+    unit_of_measurement: "Mode"
+    icon: mdi:tune
+
+  # Update Interval
+  update_interval:
+    name: "Update Interval"
+    min: 5
+    max: 60
+    step: 5
+    initial: 15
+    mode: slider
+    unit_of_measurement: "minutes"
+    icon: mdi:clock-outline
+
+# 9. Input Select (Optimization Strategy)
+input_select:
+  # Optimization Strategy
+  optimization_strategy:
+    name: "Optimization Strategy"
+    options:
+      - "Cost Savings"
+      - "Carbon Reduction"
+      - "Grid Stability"
+      - "Battery Optimization"
+    initial: "Cost Savings"
+    icon: mdi:target
+
+# 10. Input Boolean (Feature Toggles)
+input_boolean:
+  # Enable Genetic Algorithm
+  enable_genetic_algorithm:
+    name: "Enable Genetic Algorithm"
+    initial: true
+    icon: mdi:brain
+
+  # Enable Load Control
+  enable_load_control:
+    name: "Enable Load Control"
+    initial: false
+    icon: mdi:power-plug
+
+  # Enable Battery Optimization
+  enable_battery_optimization:
+    name: "Enable Battery Optimization"
+    initial: true
+    icon: mdi:battery-charging-high
+
+# 11. Input Text (Custom Entity IDs)
+input_text:
+  # Custom PV Forecast Entity
+  custom_pv_forecast:
+    name: "Custom PV Forecast Entity"
+    initial: "sensor.solcast_pv_forecast_today"
+    max: 100
+    icon: mdi:solar-panel
+
+  # Custom Load Forecast Entity
+  custom_load_forecast:
+    name: "Custom Load Forecast Entity"
+    initial: "sensor.load_forecast"
+    max: 100
+    icon: mdi:chart-line"
+
+# 12. Automation (Example Rules)
+automation:
+  # Update Load Forecast Every Hour
+  - alias: "Update Load Forecast"
+    trigger:
+      platform: time_pattern
+      hours: "/1"
+    action:
+      service: sensor.load_forecast_update
+      target:
+        entity_id: sensor.load_forecast
+
+  # Optimize Loads at 6 AM
+  - alias: "Morning Load Optimization"
+    trigger:
+      platform: time
+      at: "06:00:00"
+    action:
+      service: genetic_load_manager.optimize_loads
+      data:
+        optimization_mode: "cost_savings"
+
+# 13. Script (Example Optimization)
+script:
+  # Run Genetic Algorithm
+  run_genetic_algorithm:
+    alias: "Run Genetic Algorithm"
+    sequence:
+      - service: genetic_load_manager.optimize_loads
+        data:
+          optimization_mode: "{{ states('input_select.optimization_strategy') }}"
+          population_size: 100
+          generations: 200
+      - service: persistent_notification.create
+        data:
+          title: "Genetic Algorithm Complete"
+          message: "Load optimization completed successfully!"
+
+# 14. Scene (Example Scenes)
+scene:
+  # Energy Saving Mode
+  energy_saving_mode:
+    name: "Energy Saving Mode"
+    entities:
+      light.living_room:
+        state: "off"
+      climate.home_thermostat:
+        temperature: 18
+      switch.smart_plug:
+        state: "off"
+
+  # Peak Solar Generation
+  peak_solar_generation:
+    name: "Peak Solar Generation"
+    entities:
+      switch.ev_charger:
+        state: "on"
+      climate.home_thermostat:
+        temperature: 22
+      switch.smart_plug:
+        state: "on"
+
+# 15. Package (Complete Integration)
+# Create a file called genetic_load_manager.yaml in your packages folder
+# and include this configuration:
+genetic_load_manager:
+  optimization_mode: "{{ states('input_select.optimization_strategy') }}"
+  update_interval: "{{ states('input_number.update_interval') | int }}"
+  
+  # Required entities
+  pv_forecast_today: "{{ states('input_text.custom_pv_forecast') }}"
+  pv_forecast_tomorrow: "{{ states('input_text.custom_pv_forecast') }}"
+  load_forecast: "{{ states('input_text.custom_load_forecast') }}"
+  battery_soc: "sensor.battery_soc"
+  market_price: "sensor.omie_electricity_price"
+  
+  # Optional entities
+  grid_export_limit: "sensor.grid_export_limit"
+  demand_response: "binary_sensor.demand_response_active"
+  carbon_intensity: "sensor.carbon_intensity"
+  weather: "weather.home_weather"
+  
+  # Controllable devices
+  ev_charger: "switch.ev_charger"
+  smart_thermostat: "climate.home_thermostat"
+  smart_plug: "switch.smart_plug"
+  lighting: "light.living_room"
+  media_player: "media_player.tv"
+  
+  # Advanced settings
+  population_size: 100
+  generations: 200
+  mutation_rate: 0.1
+  crossover_rate: 0.8
