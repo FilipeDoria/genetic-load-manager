@@ -1,5 +1,5 @@
-import numpy as np
 import random
+import math
 from datetime import datetime, timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
@@ -49,7 +49,7 @@ class GeneticLoadOptimizer:
         slot_duration = timedelta(minutes=15)
         forecast_horizon = timedelta(hours=24)
         end_time = current_time + forecast_horizon
-        pv_forecast = np.zeros(self.time_slots)
+        pv_forecast = [0.0] * self.time_slots
 
         # Fetch today's and tomorrow's Solcast forecasts
         pv_today_state = None
@@ -123,19 +123,23 @@ class GeneticLoadOptimizer:
             if load_state and load_state.state not in ['unknown', 'unavailable']:
                 try:
                     forecast_data = load_state.attributes.get("forecast", [0.1] * self.time_slots)
-                    self.load_forecast = np.array([float(x) for x in forecast_data])
+                    self.load_forecast = [float(x) for x in forecast_data]
                     if len(self.load_forecast) != self.time_slots:
                         _LOGGER.warning(f"Load forecast size mismatch: got {len(self.load_forecast)}, expected {self.time_slots}")
-                        self.load_forecast = np.resize(self.load_forecast, self.time_slots)
+                        # Resize to match time slots
+                        if len(self.load_forecast) < self.time_slots:
+                            self.load_forecast.extend([0.1] * (self.time_slots - len(self.load_forecast)))
+                        elif len(self.load_forecast) > self.time_slots:
+                            self.load_forecast = self.load_forecast[:self.time_slots]
                 except (ValueError, TypeError) as e:
                     _LOGGER.error(f"Error parsing load forecast data: {e}")
-                    self.load_forecast = np.full(self.time_slots, 0.1)
+                    self.load_forecast = [0.1] * self.time_slots
             else:
                 _LOGGER.warning(f"Load forecast entity unavailable: {self.load_forecast_entity}")
-                self.load_forecast = np.full(self.time_slots, 0.1)
+                self.load_forecast = [0.1] * self.time_slots
         else:
             _LOGGER.warning("No load forecast entity configured")
-            self.load_forecast = np.full(self.time_slots, 0.1)
+            self.load_forecast = [0.1] * self.time_slots
 
         # Fetch battery state and pricing
         if self.battery_soc_entity:
@@ -169,21 +173,30 @@ class GeneticLoadOptimizer:
         if not self.use_indexed_pricing:
             # Fallback to simple dynamic pricing entity
             pricing_state = self.hass.states.get(self.dynamic_pricing_entity)
-            self.pricing = np.array([float(x) for x in pricing_state.attributes.get("prices", [0.1] * self.time_slots)] if pricing_state else [0.1] * self.time_slots)
+            self.pricing = [float(x) for x in pricing_state.attributes.get("prices", [0.1] * self.time_slots)] if pricing_state else [0.1] * self.time_slots
         
         # Ensure pricing is initialized even if both methods fail
         if not hasattr(self, 'pricing') or self.pricing is None:
             _LOGGER.warning("Both indexed and dynamic pricing failed, using default pricing")
-            self.pricing = np.full(self.time_slots, 0.1)  # Default 0.1 €/kWh
+            self.pricing = [0.1] * self.time_slots  # Default 0.1 €/kWh
         self.pv_forecast = pv_forecast
-        _LOGGER.debug(f"PV forecast (96 slots): {pv_forecast.tolist()}")
+        _LOGGER.debug(f"PV forecast (96 slots): {pv_forecast}")
 
     async def initialize_population(self):
-        self.population = np.random.uniform(0, 1, (self.population_size, self.num_devices, self.time_slots))
+        # Initialize population with random values
+        self.population = []
+        for _ in range(self.population_size):
+            device_schedule = []
+            for _ in range(self.num_devices):
+                time_schedule = [random.uniform(0, 1) for _ in range(self.time_slots)]
+                device_schedule.append(time_schedule)
+            self.population.append(device_schedule)
         for i in range(self.population_size):
             for d in range(self.num_devices):
                 if self.binary_control:
-                    self.population[i, d, :] = (self.population[i, d, :] > 0.5).astype(float)
+                    # Convert to binary (0 or 1)
+                    for t in range(self.time_slots):
+                        self.population[i][d][t] = 1.0 if self.population[i][d][t] > 0.5 else 0.0
 
     async def fitness_function(self, chromosome):
         try:
@@ -203,7 +216,7 @@ class GeneticLoadOptimizer:
             battery_soc = self.battery_soc if hasattr(self, 'battery_soc') and self.battery_soc is not None else 0.0
             
             for t in range(self.time_slots):
-                total_load = np.sum(chromosome[:, t])
+                total_load = sum(chromosome[d][t] for d in range(len(chromosome)))
                 net_load = total_load - self.pv_forecast[t]
                 grid_energy = max(0, net_load)
                 cost += grid_energy * self.pricing[t]
@@ -220,17 +233,17 @@ class GeneticLoadOptimizer:
                 # Battery constraint penalty
                 if battery_soc < 0 or battery_soc > self.battery_capacity:
                     battery_penalty += abs(battery_soc - self.battery_capacity / 2) * 100
-                battery_soc = np.clip(battery_soc, 0, self.battery_capacity)
+                battery_soc = max(0, min(battery_soc, self.battery_capacity))
                 
                 # Device priority penalty
                 for d in range(self.num_devices):
-                    priority_penalty += (1 - chromosome[d, t]) * self.device_priorities[d]
+                    priority_penalty += (1 - chromosome[d][t]) * self.device_priorities[d]
             
             solar_efficiency = solar_utilization / self.time_slots
             fitness = -(0.5 * cost + 0.3 * battery_penalty + 0.1 * priority_penalty - 0.1 * solar_efficiency)
             
             # Ensure finite result
-            if not np.isfinite(fitness):
+            if not math.isfinite(fitness):
                 _LOGGER.warning("Non-finite fitness value calculated")
                 return -1000.0
                 
@@ -258,7 +271,7 @@ class GeneticLoadOptimizer:
         
         for generation in range(self.generations):
             # Calculate fitness scores synchronously in executor
-            fitness_scores = np.array([self._fitness_function_sync(ind) for ind in self.population])
+            fitness_scores = [self._fitness_function_sync(ind) for ind in self.population]
             
             new_population = []
             for _ in range(self.population_size // 2):
@@ -269,11 +282,11 @@ class GeneticLoadOptimizer:
                 child2 = self._mutate_sync(child2, generation)
                 new_population.extend([child1, child2])
             
-            self.population = np.array(new_population)
-            max_fitness = np.max(fitness_scores)
+            self.population = new_population
+            max_fitness = max(fitness_scores)
             if max_fitness > best_fitness:
                 best_fitness = max_fitness
-                best_solution = self.population[np.argmax(fitness_scores)].copy()
+                best_solution = [row[:] for row in self.population[fitness_scores.index(max(fitness_scores))]]
                 
             # Log progress every 50 generations
             if generation % 50 == 0:
@@ -291,7 +304,7 @@ class GeneticLoadOptimizer:
         battery_usage = 0.0
         
         for t in range(self.time_slots):
-            device_consumption = np.sum(chromosome[:, t])
+            device_consumption = sum(chromosome[d][t] for d in range(len(chromosome)))
             net_load = self.load_forecast[t] + device_consumption - self.pv_forecast[t]
             
             if hasattr(self, 'pricing') and self.pricing is not None:
@@ -309,23 +322,34 @@ class GeneticLoadOptimizer:
         """Synchronous tournament selection for executor."""
         tournament_size = 5
         selection = random.sample(range(self.population_size), tournament_size)
-        best_idx = selection[np.argmax([fitness_scores[i] for i in selection])]
+        best_idx = selection[[fitness_scores[i] for i in selection].index(max([fitness_scores[i] for i in selection]))]
         return self.population[best_idx]
 
     def _crossover_sync(self, parent1, parent2):
         """Synchronous crossover for executor."""
         if random.random() < self.crossover_rate:
             point = random.randint(1, self.time_slots - 1)
-            parent1[:, point:], parent2[:, point:] = parent2[:, point:].copy(), parent1[:, point:].copy()
-        return parent1.copy(), parent2.copy()
+            # Swap the time segments after the crossover point
+            for d in range(len(parent1)):
+                parent1[d][point:], parent2[d][point:] = parent2[d][point:][:], parent1[d][point:][:]
+        # Deep copy the parents
+        parent1_copy = [[val for val in device] for device in parent1]
+        parent2_copy = [[val for val in device] for device in parent2]
+        return parent1_copy, parent2_copy
 
     def _mutate_sync(self, chromosome, generation):
         """Synchronous mutation for executor."""
         adaptive_rate = self.mutation_rate * (1 - generation / self.generations)
-        mutation_mask = np.random.random(chromosome.shape) < adaptive_rate
-        chromosome[mutation_mask] = np.random.random(np.sum(mutation_mask))
+        # Apply mutation to random positions
+        for d in range(len(chromosome)):
+            for t in range(len(chromosome[d])):
+                if random.random() < adaptive_rate:
+                    chromosome[d][t] = random.random()
         if self.binary_control:
-            chromosome = (chromosome > 0.5).astype(float)
+            # Convert to binary (0 or 1)
+            for d in range(len(chromosome)):
+                for t in range(len(chromosome[d])):
+                    chromosome[d][t] = 1.0 if chromosome[d][t] > 0.5 else 0.0
         return chromosome
 
     async def tournament_selection(self, fitness_scores):
@@ -333,24 +357,36 @@ class GeneticLoadOptimizer:
         selection = random.sample(range(self.population_size), tournament_size)
         # Use pre-calculated fitness scores instead of recalculating
         tournament_fitness = [fitness_scores[i] for i in selection]
-        best_idx = selection[np.argmax(tournament_fitness)]
+        best_idx = selection[tournament_fitness.index(max(tournament_fitness))]
         return self.population[best_idx]
 
     async def crossover(self, parent1, parent2):
         if random.random() < self.crossover_rate:
             point = random.randint(1, self.time_slots - 1)
-            child1 = np.concatenate((parent1[:, :point], parent2[:, point:]), axis=1)
-            child2 = np.concatenate((parent2[:, :point], parent1[:, point:]), axis=1)
+            # Create children by combining parent schedules
+            child1 = []
+            child2 = []
+            for d in range(len(parent1)):
+                child1_device = parent1[d][:point] + parent2[d][point:]
+                child2_device = parent2[d][:point] + parent1[d][point:]
+                child1.append(child1_device)
+                child2.append(child2_device)
             return child1, child2
-        return parent1.copy(), parent2.copy()
+        # Deep copy the parents
+        parent1_copy = [[val for val in device] for device in parent1]
+        parent2_copy = [[val for val in device] for device in parent2]
+        return parent1_copy, parent2_copy
 
     async def mutate(self, chromosome, generation):
         adaptive_rate = self.mutation_rate * (1 - generation / self.generations)
-        mutation_mask = np.random.random(chromosome.shape) < adaptive_rate
-        if self.binary_control:
-            chromosome[mutation_mask] = 1 - chromosome[mutation_mask]
-        else:
-            chromosome[mutation_mask] = np.random.uniform(0, 1)
+        # Apply mutation to random positions
+        for d in range(len(chromosome)):
+            for t in range(len(chromosome[d])):
+                if random.random() < adaptive_rate:
+                    if self.binary_control:
+                        chromosome[d][t] = 1 - chromosome[d][t]
+                    else:
+                        chromosome[d][t] = random.uniform(0, 1)
         return chromosome
 
     async def schedule_optimization(self):
@@ -425,15 +461,15 @@ class GeneticLoadOptimizer:
             await self.fetch_forecast_data()
         
         # Simple rule-based scheduling based on PV forecast and pricing
-        schedule = np.zeros((self.num_devices, self.time_slots))
+        schedule = [[0.0 for _ in range(self.time_slots)] for _ in range(self.num_devices)]
         
         # Safety check for forecast data
         if hasattr(self, 'pv_forecast') and hasattr(self, 'pricing') and self.pv_forecast is not None and self.pricing is not None:
             for t in range(self.time_slots):
                 # Turn on devices when PV generation is high and prices are low
-                if self.pv_forecast[t] > 0.5 and self.pricing[t] < np.mean(self.pricing):
+                if self.pv_forecast[t] > 0.5 and self.pricing[t] < sum(self.pricing) / len(self.pricing):
                     for d in range(self.num_devices):
-                        schedule[d, t] = 1.0
+                        schedule[d][t] = 1.0
         
         return schedule
 

@@ -10,10 +10,7 @@
   "codeowners": [
     "@filipe0doria"
   ],
-  "requirements": [
-    "numpy>=1.21.0",
-    "scipy>=1.7.0"
-  ],
+  "requirements": [],
   "iot_class": "calculated",
   "version": "1.0.0",
   "config_flow": true,

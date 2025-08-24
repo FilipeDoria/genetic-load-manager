@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
-import numpy as np
+
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ class IndexedTariffCalculator:
         else:
             return self.winter_adjustment
     
-    async def get_24h_price_forecast(self, start_time: datetime = None) -> np.ndarray:
+    async def get_24h_price_forecast(self, start_time: datetime = None) -> List[float]:
         """
         Generate 24-hour price forecast in 15-minute intervals (96 slots).
         
@@ -140,7 +140,7 @@ class IndexedTariffCalculator:
         current_market_price = await self.get_current_market_price()
         
         # Generate 96 price points (24 hours * 4 quarters)
-        prices = np.zeros(96)
+        prices = [0.0] * 96
         
         for i in range(96):
             slot_time = start_time + timedelta(minutes=15 * i)
@@ -159,7 +159,7 @@ class IndexedTariffCalculator:
         self._cached_prices[cache_key] = prices
         self._last_update = datetime.now()
         
-        _LOGGER.debug(f"Generated 24h price forecast: min={np.min(prices):.4f}, max={np.max(prices):.4f}, avg={np.mean(prices):.4f}")
+        _LOGGER.debug(f"Generated 24h price forecast: min={min(prices):.4f}, max={max(prices):.4f}, avg={sum(prices)/len(prices):.4f}")
         
         return prices
     

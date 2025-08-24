@@ -1,9 +1,11 @@
 """Advanced analytics and cost analysis for Genetic Load Manager."""
 import logging
 import json
+import math
+import random
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
-import numpy as np
+
 from homeassistant.core import HomeAssistant
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -165,7 +167,7 @@ class CostAnalyticsSensor(SensorEntity):
                     "cost": round(cost, 2),
                     "device_status": device_status,
                     "is_peak": hour in [18, 19, 20, 21],  # Peak hours
-                    "solar_available": max(0, np.sin((hour - 6) * np.pi / 12)) * 2 if 6 <= hour <= 18 else 0
+                    "solar_available": max(0, math.sin((hour - 6) * math.pi / 12)) * 2 if 6 <= hour <= 18 else 0
                 })
             
             self._cost_data["hourly_breakdown"] = hourly_breakdown
@@ -205,7 +207,7 @@ class CostAnalyticsSensor(SensorEntity):
                     "energy_consumed_kwh": hours_on_today * power_consumption / 1000,
                     "cost_today": round(daily_cost, 2),
                     "avg_hourly_cost": round(daily_cost / max(hours_on_today, 1), 2),
-                    "efficiency_score": np.random.uniform(75, 95),  # Placeholder
+                    "efficiency_score": random.uniform(75, 95),  # Placeholder
                     "optimization_savings": round(daily_cost * 0.15, 2)  # 15% savings estimate
                 }
             
@@ -272,16 +274,16 @@ class CostAnalyticsSensor(SensorEntity):
             # Solar utilization efficiency
             solar_efficiency = 0
             if genetic_algo and hasattr(genetic_algo, 'pv_forecast') and genetic_algo.pv_forecast is not None:
-                total_solar = np.sum(genetic_algo.pv_forecast)
+                total_solar = sum(genetic_algo.pv_forecast)
                 if total_solar > 0:
                     # Estimate actual utilization vs available
-                    solar_efficiency = np.random.uniform(78, 92)  # Placeholder
+                    solar_efficiency = random.uniform(78, 92)  # Placeholder
             
             # Load optimization efficiency
-            load_efficiency = np.random.uniform(82, 95)  # Placeholder
+            load_efficiency = random.uniform(82, 95)  # Placeholder
             
             # Battery efficiency (if applicable)
-            battery_efficiency = np.random.uniform(85, 95)  # Placeholder
+            battery_efficiency = random.uniform(85, 95)  # Placeholder
             
             # Overall system efficiency
             overall_efficiency = (solar_efficiency + load_efficiency + battery_efficiency) / 3
@@ -289,11 +291,11 @@ class CostAnalyticsSensor(SensorEntity):
             self._cost_data["efficiency_metrics"] = {
                 "solar_utilization_percent": round(solar_efficiency, 1),
                 "load_optimization_percent": round(load_efficiency, 1),
-                "battery_efficiency_percent": round(battery_efficiency, 1),
-                "overall_system_efficiency": round(overall_efficiency, 1),
-                "optimization_convergence_rate": np.random.uniform(85, 98),  # Placeholder
-                "algorithm_performance_score": np.random.uniform(88, 96),  # Placeholder
-                "energy_waste_reduction": round(np.random.uniform(15, 25), 1)  # Placeholder
+                            "battery_efficiency_percent": round(battery_efficiency, 1),
+            "overall_system_efficiency": round(overall_efficiency, 1),
+            "optimization_convergence_rate": random.uniform(85, 98),  # Placeholder
+            "algorithm_performance_score": random.uniform(88, 96),  # Placeholder
+            "energy_waste_reduction": round(random.uniform(15, 25), 1)  # Placeholder
             }
             
         except Exception as e:
@@ -315,7 +317,7 @@ class CostAnalyticsSensor(SensorEntity):
             
             # Calculate market trends (simplified)
             price_trend = "stable"  # Could be "rising", "falling", "stable"
-            volatility = np.random.uniform(5, 15)  # Price volatility percentage
+            volatility = random.uniform(5, 15)  # Price volatility percentage
             
             # Time-of-use analysis
             peak_premium = (current_price * 1.2 - current_price) / current_price * 100
@@ -330,7 +332,7 @@ class CostAnalyticsSensor(SensorEntity):
                 "off_peak_discount_percent": round(off_peak_discount, 1),
                 "market_components": pricing_components,
                 "optimal_consumption_hours": self._identify_optimal_hours(),
-                "price_forecast_confidence": np.random.uniform(75, 90)  # Placeholder
+                "price_forecast_confidence": random.uniform(75, 90)  # Placeholder
             }
             
         except Exception as e:
@@ -346,8 +348,17 @@ class CostAnalyticsSensor(SensorEntity):
             
             # Calculate trends
             recent_savings = [entry["savings"] for entry in daily_costs[-7:]]
-            avg_daily_savings = np.mean(recent_savings)
-            savings_trend = np.polyfit(range(len(recent_savings)), recent_savings, 1)[0]
+            avg_daily_savings = sum(recent_savings) / len(recent_savings)
+            # Simple linear trend calculation (replacement for polyfit)
+            if len(recent_savings) > 1:
+                x_values = list(range(len(recent_savings)))
+                x_mean = sum(x_values) / len(x_values)
+                y_mean = avg_daily_savings
+                numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(x_values, recent_savings))
+                denominator = sum((x - x_mean) ** 2 for x in x_values)
+                savings_trend = numerator / denominator if denominator != 0 else 0
+            else:
+                savings_trend = 0
             
             # Generate forecasts
             forecasts = {
@@ -452,12 +463,12 @@ class CostAnalyticsSensor(SensorEntity):
     def _estimate_device_runtime(self, device_id: int) -> float:
         """Estimate device runtime for today."""
         # Simplified estimation - in real implementation, track actual runtime
-        return np.random.uniform(2, 8)  # 2-8 hours
+        return random.uniform(2, 8)  # 2-8 hours
 
     def _calculate_peak_hours_savings(self) -> float:
         """Calculate savings specifically during peak hours."""
         # Simplified calculation
-        return np.random.uniform(1.5, 4.0)  # €
+        return random.uniform(1.5, 4.0)  # €
 
     def _calculate_savings_consistency(self) -> float:
         """Calculate how consistent the savings are."""
@@ -470,14 +481,24 @@ class CostAnalyticsSensor(SensorEntity):
             return 50.0
         
         # Calculate coefficient of variation (lower is more consistent)
-        mean_savings = np.mean(savings)
+        mean_savings = sum(savings) / len(savings)
         if mean_savings == 0:
             return 50.0
         
-        cv = np.std(savings) / mean_savings
+        # Calculate standard deviation manually
+        variance = sum((x - mean_savings) ** 2 for x in savings) / len(savings)
+        cv = math.sqrt(variance) / mean_savings
         consistency = max(0, 100 - (cv * 100))  # Convert to 0-100 scale
         
         return round(consistency, 1)
+
+    def _calculate_std(self, values: List[float]) -> float:
+        """Calculate standard deviation manually."""
+        if not values:
+            return 0.0
+        mean_val = sum(values) / len(values)
+        variance = sum((x - mean_val) ** 2 for x in values) / len(values)
+        return math.sqrt(variance)
 
     def _identify_optimal_hours(self) -> List[int]:
         """Identify optimal hours for energy consumption."""
@@ -611,8 +632,8 @@ class CostAnalyticsSensor(SensorEntity):
             recent_savings = [entry["savings"] for entry in daily_costs[-14:]]
             older_savings = [entry["savings"] for entry in daily_costs[-28:-14]] if len(daily_costs) >= 28 else []
             
-            recent_avg = np.mean(recent_savings)
-            older_avg = np.mean(older_savings) if older_savings else recent_avg
+            recent_avg = sum(recent_savings) / len(recent_savings)
+            older_avg = sum(older_savings) / len(older_savings) if older_savings else recent_avg
             
             trend_direction = "improving" if recent_avg > older_avg else "declining" if recent_avg < older_avg else "stable"
             trend_magnitude = abs(recent_avg - older_avg) / older_avg * 100 if older_avg > 0 else 0
@@ -626,8 +647,8 @@ class CostAnalyticsSensor(SensorEntity):
                     "comparison_average": round(older_avg, 2)
                 },
                 "volatility": {
-                    "coefficient_of_variation": round(np.std(recent_savings) / np.mean(recent_savings) * 100, 1),
-                    "stability_rating": "high" if np.std(recent_savings) / np.mean(recent_savings) < 0.2 else "medium"
+                    "coefficient_of_variation": round(self._calculate_std(recent_savings) / (sum(recent_savings) / len(recent_savings)) * 100, 1),
+                    "stability_rating": "high" if self._calculate_std(recent_savings) / (sum(recent_savings) / len(recent_savings)) < 0.2 else "medium"
                 },
                 "forecast_confidence": 85 if trend_direction != "stable" else 75
             }

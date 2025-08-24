@@ -1,9 +1,11 @@
 """Dashboard and visualization components for Genetic Load Manager."""
 import logging
 import json
+import math
+import random
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-import numpy as np
+
 from homeassistant.core import HomeAssistant
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -145,7 +147,7 @@ class OptimizationDashboardSensor(SensorEntity):
         try:
             # Solar utilization
             if hasattr(genetic_algo, 'pv_forecast') and genetic_algo.pv_forecast is not None:
-                total_solar = np.sum(genetic_algo.pv_forecast)
+                total_solar = sum(genetic_algo.pv_forecast)
                 if total_solar > 0:
                     # Estimate utilization (in real implementation, compare with actual usage)
                     utilization = min(100, (total_solar * 0.85) / total_solar * 100)  # 85% utilization estimate
@@ -224,10 +226,10 @@ class OptimizationDashboardSensor(SensorEntity):
                     "price": round(price, 4),
                     "devices": {
                         "device_0": device_status,
-                        "device_1": "on" if price < 0.12 else "off"
-                    },
-                    "solar_forecast": round(np.random.uniform(0, 2), 2),  # Demo data
-                    "load_forecast": round(np.random.uniform(0.5, 1.5), 2)  # Demo data
+                                              "device_1": "on" if price < 0.12 else "off"
+                  },
+                  "solar_forecast": round(random.uniform(0, 2), 2),  # Demo data
+                  "load_forecast": round(random.uniform(0.5, 1.5), 2)  # Demo data
                 })
             
             self._dashboard_data["schedule_preview"] = schedule_preview
@@ -307,11 +309,11 @@ class OptimizationDashboardSensor(SensorEntity):
                 "total_devices": len([s for s in self._dashboard_data["schedule_preview"] if s.get("devices")]),
                 "active_optimizations": 1 if self._dashboard_data["current_status"] == "optimizing" else 0,
                 "daily_cost_savings": f"€{self._dashboard_data['cost_savings']['daily']:.2f}",
-                "system_efficiency": f"{self._calculate_overall_health()}%",
-                "next_optimization": self._get_next_optimization_time(),
-                "solar_production_today": f"{np.random.uniform(15, 25):.1f} kWh",  # Demo data
-                "grid_import_today": f"{np.random.uniform(8, 15):.1f} kWh",  # Demo data
-                "battery_cycles_today": np.random.randint(1, 3)  # Demo data
+                                  "system_efficiency": f"{self._calculate_overall_health()}%",
+                  "next_optimization": self._get_next_optimization_time(),
+                  "solar_production_today": f"{random.uniform(15, 25):.1f} kWh",  # Demo data
+                  "grid_import_today": f"{random.uniform(8, 15):.1f} kWh",  # Demo data
+                  "battery_cycles_today": random.randint(1, 3)  # Demo data
             }
         except Exception as e:
             _LOGGER.error(f"Error generating quick stats: {e}")
@@ -466,7 +468,7 @@ class ScheduleVisualizationSensor(SensorEntity):
                     "price": price,
                     "devices": device_predictions,
                     "total_load": sum(device_predictions.values()),
-                    "solar_forecast": max(0, np.sin(slot * np.pi / 48) * 2)  # Simplified solar curve
+                    "solar_forecast": max(0, math.sin(slot * math.pi / 48) * 2)  # Simplified solar curve
                 })
             
             self._schedule_data["predicted_schedule"] = predicted_schedule
@@ -488,7 +490,7 @@ class ScheduleVisualizationSensor(SensorEntity):
                     time_point = datetime.now() - timedelta(hours=23-hour)
                     
                     # Simulate historical data
-                    was_on = np.random.choice([True, False], p=[0.3, 0.7])
+                    was_on = random.choice([True, False])  # Simplified random choice
                     
                     timeline.append({
                         "time": time_point.strftime("%H:%M"),

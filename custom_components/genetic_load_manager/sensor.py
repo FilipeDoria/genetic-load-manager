@@ -7,7 +7,7 @@ from homeassistant.helpers.typing import DiscoveryInfoType
 from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
-import numpy as np
+
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ class LoadForecastSensor(SensorEntity):
     async def _generate_forecast_from_last_24h(self, history):
         """Generate a 96-slot forecast based on the last 24 hours of load data."""
         current_time = datetime.now()
-        forecast = np.zeros(96)
+        forecast = [0.0] * 96
         
         # Create time slots for the next 24 hours (96 x 15-minute intervals)
         time_slots = []
@@ -154,8 +154,8 @@ class LoadForecastSensor(SensorEntity):
                 # No data for this time slot, use default
                 forecast[i] = 0.1
         
-        _LOGGER.debug(f"Generated 24h forecast from last 24h data: total={np.sum(forecast):.2f} kWh")
-        return forecast.tolist()
+        _LOGGER.debug(f"Generated 24h forecast from last 24h data: total={sum(forecast):.2f} kWh")
+        return forecast
 
     def _get_time_slot_index(self, timestamp):
         """Get the time slot index (0-95) for a given timestamp based on time of day."""
