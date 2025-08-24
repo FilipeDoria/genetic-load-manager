@@ -170,7 +170,7 @@ async def async_register_services(hass: HomeAssistant):
                                 entity_id,
                                 schedule_value,
                                 attributes={
-                                    "schedule": schedule[d].tolist(),
+                                    "schedule": schedule[d],
                                     "scheduler_mode": "rule-based",
                                     "timestamp": datetime.now().isoformat()
                                 }

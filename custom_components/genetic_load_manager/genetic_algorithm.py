@@ -400,7 +400,7 @@ class GeneticLoadOptimizer:
                             await self.hass.states.async_set(
                                 f"switch.device_{d}_schedule",
                                 "on" if solution[d][0] > 0.5 else "off",
-                                attributes={"schedule": solution[d].tolist()}
+                                attributes={"schedule": solution[d]}
                             )
                         except Exception as e:
                             _LOGGER.error(f"Error updating device {d} schedule: {e}")

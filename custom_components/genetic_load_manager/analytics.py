@@ -69,7 +69,7 @@ class CostAnalyticsSensor(SensorEntity):
         async_track_time_interval(self.hass, self.async_update, timedelta(minutes=10))
         await self.async_update()
 
-    async def async_update(self):
+    async def async_update(self, now=None):
         """Update cost analytics with latest data."""
         try:
             await self._update_daily_costs()

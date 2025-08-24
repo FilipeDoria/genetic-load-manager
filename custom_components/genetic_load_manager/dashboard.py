@@ -67,7 +67,7 @@ class OptimizationDashboardSensor(SensorEntity):
         async_track_time_interval(self.hass, self.async_update, timedelta(minutes=1))
         await self.async_update()
 
-    async def async_update(self):
+    async def async_update(self, now=None):
         """Update dashboard with latest data."""
         try:
             # Get genetic algorithm instance
@@ -391,7 +391,7 @@ class ScheduleVisualizationSensor(SensorEntity):
         async_track_time_interval(self.hass, self.async_update, timedelta(minutes=5))
         await self.async_update()
 
-    async def async_update(self):
+    async def async_update(self, now=None):
         """Update schedule visualization data."""
         try:
             genetic_algo = self.hass.data.get(DOMAIN, {}).get('genetic_algorithm')
@@ -502,7 +502,7 @@ class ScheduleVisualizationSensor(SensorEntity):
                 
                 device_timelines[device_name] = {
                     "historical": timeline,
-                    "current_state": self.hass.states.get(f"switch.{device_name}_schedule", {}).get("state", "off"),
+                    "current_state": (self.hass.states.get(f"switch.{device_name}_schedule") or {}).get("state", "off"),
                     "total_runtime_today": sum(1 for t in timeline if t["state"] == "on"),
                     "energy_consumed_today": sum(t["power_consumption"] for t in timeline) / 1000,  # kWh
                     "cost_today": sum(t["cost_impact"] for t in timeline)

@@ -188,7 +188,7 @@ class ControlPanelSensor(SensorEntity):
         except Exception as e:
             _LOGGER.error(f"Error initializing control panel: {e}")
 
-    async def async_update(self):
+    async def async_update(self, now=None):
         """Update control panel state."""
         try:
             await self._update_active_controls()
