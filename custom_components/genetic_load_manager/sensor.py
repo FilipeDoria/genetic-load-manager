@@ -1,24 +1,28 @@
 """Sensor platform for Genetic Load Manager integration."""
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-from homeassistant.const import ENERGY_KILO_WATT_HOUR
+from homeassistant.helpers.typing import DiscoveryInfoType
+from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
 import numpy as np
 import logging
 
 _LOGGER = logging.getLogger(__name__)
-DOMAIN = "genetic_load_manager"
+from .const import DOMAIN
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigType, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback, discovery_info: DiscoveryInfoType = None):
     """Set up the sensor platform for the genetic load manager."""
     sensors = [LoadForecastSensor(hass, entry.data)]
     
     # Add pricing sensor if indexed pricing is enabled
     if entry.data.get("use_indexed_pricing", True):
         sensors.append(IndexedPricingSensor(hass, entry.data))
+    
+    # Add status sensor
+    sensors.append(GeneticAlgorithmStatusSensor(hass, entry.data))
     
     # Add dashboard sensors
     from .dashboard import OptimizationDashboardSensor, ScheduleVisualizationSensor
@@ -42,11 +46,12 @@ class LoadForecastSensor(SensorEntity):
         self.hass = hass
         self._attr_unique_id = f"{DOMAIN}_load_forecast"
         self._attr_name = "Load Forecast"
-        self._attr_unit_of_measurement = ENERGY_KILO_WATT_HOUR
+        self._attr_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_device_class = "energy"
-        self._load_sensor_entity = config.get("load_sensor_entity")
-        self._forecast = []
         self._state = None
+        self._attributes = {}
+        self.load_sensor_entity = config.get("load_sensor_entity")
+        self._async_unsub_track_time = None  # Track the time interval unsub function
 
     @property
     def state(self):
@@ -60,12 +65,20 @@ class LoadForecastSensor(SensorEntity):
 
     async def async_added_to_hass(self):
         """Set up periodic updates for the sensor."""
-        async_track_time_interval(self.hass, self.async_update, timedelta(minutes=15))
+        self._async_unsub_track_time = async_track_time_interval(
+            self.hass, self.async_update, timedelta(minutes=15)
+        )
         await self.async_update()
+
+    async def async_will_remove_from_hass(self):
+        """Clean up when removing entity."""
+        if self._async_unsub_track_time:
+            self._async_unsub_track_time()
+            self._async_unsub_track_time = None
 
     async def async_update(self):
         """Update the sensor with a new 24-hour load forecast based on last 24 hours of data."""
-        if not self._load_sensor_entity:
+        if not self.load_sensor_entity:
             _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
             self._forecast = [0.0] * 96
             self._state = 0.0
@@ -90,16 +103,18 @@ class LoadForecastSensor(SensorEntity):
         start_time = end_time - timedelta(hours=24)
         
         try:
-            history = await get_significant_states(
+            history = await self.hass.async_add_executor_job(
+                get_significant_states,
                 self.hass,
                 start_time,
                 end_time,
-                [self._load_sensor_entity],
-                significant_changes_only=True
+                [self.load_sensor_entity],
+                None,  # end_time_param
+                True   # significant_changes_only
             )
-            return history.get(self._load_sensor_entity, [])
+            return history.get(self.load_sensor_entity, [])
         except Exception as e:
-            _LOGGER.error(f"Error fetching last 24h data for {self._load_sensor_entity}: {e}")
+            _LOGGER.error(f"Error fetching last 24h data for {self.load_sensor_entity}: {e}")
             return []
 
     async def _generate_forecast_from_last_24h(self, history):
@@ -246,3 +261,72 @@ class IndexedPricingSensor(SensorEntity):
             _LOGGER.error(f"Error updating indexed pricing sensor: {e}")
             if self._state is None:
                 self._state = 0.1  # Fallback price
+
+
+class GeneticAlgorithmStatusSensor(SensorEntity):
+    """Sensor entity for genetic algorithm status and metrics."""
+
+    def __init__(self, hass: HomeAssistant, config: dict):
+        """Initialize the genetic algorithm status sensor."""
+        self.hass = hass
+        self._attr_unique_id = f"{DOMAIN}_genetic_algorithm_status"
+        self._attr_name = "Genetic Algorithm Status"
+        self._attr_unit_of_measurement = None
+        self._attr_device_class = None
+        self._state = "idle"
+        self._attributes = {}
+
+    @property
+    def state(self):
+        """Return the current status of the genetic algorithm."""
+        return self._state
+
+    @property
+    def extra_state_attributes(self):
+        """Return detailed status information as attributes."""
+        return self._attributes
+
+    async def async_added_to_hass(self):
+        """Set up the sensor."""
+        await self.async_update()
+
+    async def async_update(self):
+        """Update the sensor status."""
+        try:
+            # Get genetic algorithm instance from hass data
+            genetic_algo = self.hass.data.get(DOMAIN, {}).get('genetic_algorithm')
+            
+            if genetic_algo:
+                # Update status based on genetic algorithm state
+                if hasattr(genetic_algo, 'is_running') and genetic_algo.is_running:
+                    self._state = "running"
+                elif hasattr(genetic_algo, 'is_optimizing') and genetic_algo.is_optimizing:
+                    self._state = "optimizing"
+                else:
+                    self._state = "idle"
+                
+                # Update attributes
+                self._attributes = {
+                    "last_updated": datetime.now().isoformat(),
+                    "population_size": getattr(genetic_algo, 'population_size', 100),
+                    "generations": getattr(genetic_algo, 'generations', 200),
+                    "mutation_rate": getattr(genetic_algo, 'mutation_rate', 0.05),
+                    "crossover_rate": getattr(genetic_algo, 'crossover_rate', 0.8),
+                    "best_fitness": getattr(genetic_algo, 'best_fitness', None),
+                    "current_generation": getattr(genetic_algo, 'best_fitness', None),
+                    "optimization_count": getattr(genetic_algo, 'optimization_count', 0)
+                }
+            else:
+                self._state = "not_initialized"
+                self._attributes = {
+                    "last_updated": datetime.now().isoformat(),
+                    "error": "Genetic algorithm not available"
+                }
+                
+        except Exception as e:
+            _LOGGER.error(f"Error updating genetic algorithm status sensor: {e}")
+            self._state = "error"
+            self._attributes = {
+                "last_updated": datetime.now().isoformat(),
+                "error": str(e)
+            }

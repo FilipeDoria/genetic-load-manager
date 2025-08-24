@@ -1,7 +1,0 @@
-{
-  "name": "Genetic Load Manager",
-  "render_readme": true,
-  "domains": ["sensor", "switch", "binary_sensor"],
-  "homeassistant": "2023.8.0",
-  "content_in_root": false
-} 

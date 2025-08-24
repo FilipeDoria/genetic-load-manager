@@ -9,7 +9,7 @@ from homeassistant.const import (
     CONF_NAME,
     ATTR_DEVICE_CLASS,
     ATTR_UNIT_OF_MEASUREMENT,
-    ENERGY_KILO_WATT_HOUR,
+    UnitOfEnergy,
     PERCENTAGE,
     CURRENCY_EURO,
     CURRENCY_DOLLAR
@@ -105,7 +105,7 @@ CONFIG_SCHEMA = vol.Schema({
     vol.Required("load_sensor_entity", description="Select Energy Consumption Sensor for Historical Data"): create_entity_selector(
         domain="sensor",
         device_class="energy",
-        unit=ENERGY_KILO_WATT_HOUR
+        unit=UnitOfEnergy.KILO_WATT_HOUR
     ),
     
     # Battery Management
@@ -200,10 +200,13 @@ CONFIG_SCHEMA = vol.Schema({
     ),
 })
 
-class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow):
     """Handle a config flow for Genetic Load Manager."""
 
     VERSION = 1
+    
+    # Set the domain for this config flow
+    DOMAIN = DOMAIN
 
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Handle the initial step."""
