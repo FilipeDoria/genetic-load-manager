@@ -80,6 +80,10 @@ class GeneticLoadOptimizer:
             pv_today_state = self.hass.states.get(self.pv_forecast_today_entity)
             if not pv_today_state:
                 _LOGGER.warning(f"PV forecast entity not found: {self.pv_forecast_today_entity}")
+            else:
+                _LOGGER.debug(f"Found PV today entity: {self.pv_forecast_today_entity}")
+                _LOGGER.debug(f"PV today state: {pv_today_state.state}")
+                _LOGGER.debug(f"PV today attributes: {list(pv_today_state.attributes.keys())}")
         else:
             _LOGGER.warning("No PV forecast entity configured")
             
@@ -87,11 +91,38 @@ class GeneticLoadOptimizer:
             pv_tomorrow_state = self.hass.states.get(self.pv_forecast_tomorrow_entity)
             if not pv_tomorrow_state:
                 _LOGGER.warning(f"PV tomorrow forecast entity not found: {self.pv_forecast_tomorrow_entity}")
+            else:
+                _LOGGER.debug(f"Found PV tomorrow entity: {self.pv_forecast_tomorrow_entity}")
+                _LOGGER.debug(f"PV tomorrow state: {pv_tomorrow_state.state}")
+                _LOGGER.debug(f"PV tomorrow attributes: {list(pv_tomorrow_state.attributes.keys())}")
         else:
             _LOGGER.warning("No PV tomorrow forecast entity configured")
         
-        pv_today_raw = pv_today_state.attributes.get("DetailedForecast", []) if pv_today_state else []
-        pv_tomorrow_raw = pv_tomorrow_state.attributes.get("DetailedForecast", []) if pv_tomorrow_state else []
+        # Try to get DetailedForecast first (30-minute intervals), fallback to DetailedHourly (1-hour intervals)
+        pv_today_raw = []
+        pv_tomorrow_raw = []
+        
+        if pv_today_state:
+            pv_today_raw = pv_today_state.attributes.get("DetailedForecast", [])
+            if not pv_today_raw:
+                pv_today_raw = pv_today_state.attributes.get("DetailedHourly", [])
+                _LOGGER.debug("Using DetailedHourly for today's forecast")
+            else:
+                _LOGGER.debug("Using DetailedForecast for today's forecast")
+            _LOGGER.debug(f"Today's forecast data: {len(pv_today_raw)} items")
+            if pv_today_raw:
+                _LOGGER.debug(f"First item structure: {pv_today_raw[0]}")
+                
+        if pv_tomorrow_state:
+            pv_tomorrow_raw = pv_tomorrow_state.attributes.get("DetailedForecast", [])
+            if not pv_tomorrow_raw:
+                pv_tomorrow_raw = pv_tomorrow_state.attributes.get("DetailedHourly", [])
+                _LOGGER.debug("Using DetailedHourly for tomorrow's forecast")
+            else:
+                _LOGGER.debug("Using DetailedForecast for tomorrow's forecast")
+            _LOGGER.debug(f"Tomorrow's forecast data: {len(pv_tomorrow_raw)} items")
+            if pv_tomorrow_raw:
+                _LOGGER.debug(f"First item structure: {pv_tomorrow_raw[0]}")
 
         if not pv_today_raw and not pv_tomorrow_raw:
             _LOGGER.warning("No Solcast PV forecast data available, using zeros")
@@ -100,15 +131,39 @@ class GeneticLoadOptimizer:
             # Combine forecasts
             times = []
             values = []
+            
             for forecast in [pv_today_raw, pv_tomorrow_raw]:
+                if not forecast:
+                    continue
+                    
                 for item in forecast:
                     try:
-                        period_start = datetime.fromisoformat(item["period_start"].replace("Z", "+00:00"))
-                        pv_estimate = float(item["pv_estimate"])
-                        times.append(period_start)
-                        values.append(pv_estimate)
-                    except (KeyError, ValueError) as e:
-                        _LOGGER.error(f"Error parsing Solcast forecast: {e}")
+                        # Handle both DetailedForecast and DetailedHourly structures
+                        if isinstance(item, dict) and "period_start" in item and "pv_estimate" in item:
+                            period_start = item["period_start"]
+                            pv_estimate = item["pv_estimate"]
+                            
+                            # Parse the period_start string (handle timezone info)
+                            if period_start.endswith('+01:00'):
+                                period_start = period_start.replace('+01:00', '+01:00')
+                            elif period_start.endswith('Z'):
+                                period_start = period_start.replace('Z', '+00:00')
+                            
+                            try:
+                                period_time = datetime.fromisoformat(period_start)
+                                pv_value = float(pv_estimate)
+                                
+                                # Only include future times
+                                if period_time >= current_time:
+                                    times.append(period_time)
+                                    values.append(pv_value)
+                                    
+                            except ValueError as e:
+                                _LOGGER.debug(f"Could not parse time '{period_start}': {e}")
+                                continue
+                                
+                    except (KeyError, ValueError, TypeError) as e:
+                        _LOGGER.debug(f"Error parsing Solcast forecast item: {e}, item: {item}")
                         continue
 
             if times:
@@ -118,13 +173,17 @@ class GeneticLoadOptimizer:
                 times = list(times)
                 values = list(values)
 
+                _LOGGER.info(f"Successfully parsed {len(times)} PV forecast data points from {times[0]} to {times[-1]}")
+
                 # Interpolate to 15-minute slots
                 for t in range(self.time_slots):
                     slot_time = current_time + t * slot_duration
+                    
                     if slot_time < times[0] or slot_time >= times[-1]:
                         pv_forecast[t] = 0.0
                         continue
-                    # Find bracketing times
+                        
+                    # Find bracketing times for interpolation
                     for i in range(len(times) - 1):
                         if times[i] <= slot_time < times[i + 1]:
                             # Linear interpolation
@@ -133,10 +192,14 @@ class GeneticLoadOptimizer:
                             weight = slot_diff / time_diff
                             pv_forecast[t] = values[i] * (1 - weight) + values[i + 1] * weight
                             break
+                            
+                # Set the final forecast
+                self.pv_forecast = pv_forecast
+                _LOGGER.info(f"Generated PV forecast with {len(self.pv_forecast)} slots, max value: {max(pv_forecast):.3f} kW")
+                
             else:
                 _LOGGER.warning("No valid Solcast forecast data parsed, using zeros")
                 self.pv_forecast = pv_forecast
-                return
 
         # Fetch load forecast
         if self.load_forecast_entity:

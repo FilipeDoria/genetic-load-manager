@@ -5,7 +5,6 @@ from datetime import timedelta, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
-from .genetic_algorithm import GeneticLoadOptimizer
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,6 +19,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     # Only create genetic algorithm instance if configuration is provided
     if conf:
         try:
+            # Import here to avoid blocking during setup
+            from .genetic_algorithm import GeneticLoadOptimizer
             genetic_algo = GeneticLoadOptimizer(hass, conf)
             hass.data[DOMAIN]["genetic_algorithm"] = genetic_algo
         except Exception as e:
@@ -34,8 +35,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = entry.data
     
     try:
+        # Import here to avoid blocking during setup
+        from .genetic_algorithm import GeneticLoadOptimizer
         genetic_algo = GeneticLoadOptimizer(hass, entry.data)
         hass.data[DOMAIN]['genetic_algorithm'] = genetic_algo
+        
+        # Start the optimizer asynchronously
         await genetic_algo.start()
         _LOGGER.info("Genetic Load Manager optimizer started successfully")
     except Exception as e:
@@ -85,6 +90,7 @@ async def async_register_services(hass: HomeAssistant):
         try:
             genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
             if genetic_algo:
+                # Update parameters if provided
                 if 'population_size' in call.data:
                     genetic_algo.population_size = call.data['population_size']
                 if 'generations' in call.data:
@@ -94,8 +100,10 @@ async def async_register_services(hass: HomeAssistant):
                 if 'crossover_rate' in call.data:
                     genetic_algo.crossover_rate = call.data['crossover_rate']
                 
+                # Run optimization asynchronously
                 await genetic_algo.run_optimization()
                 
+                # Update state asynchronously
                 await hass.states.async_set(
                     "sensor.genetic_algorithm_status",
                     "completed",
@@ -156,25 +164,25 @@ async def async_register_services(hass: HomeAssistant):
                 mode = call.data.get('mode', 'genetic')
                 
                 if mode == 'rule-based':
-                    # Generate rule-based schedule
+                    # Generate rule-based schedule asynchronously
                     schedule = await genetic_algo.rule_based_schedule()
                     
                     # Update device schedule entities
-                    if schedule is not None and schedule.size > 0:
+                    if schedule is not None and hasattr(schedule, 'shape') and schedule.shape[0] > 0:
                         for d in range(schedule.shape[0]):
                             if schedule.shape[1] > 0:
                                 schedule_value = "on" if schedule[d][0] > 0.5 else "off"
                                 entity_id = f"switch.device_{d}_schedule"
-                            
-                            await hass.states.async_set(
-                                entity_id,
-                                schedule_value,
-                                attributes={
-                                    "schedule": schedule[d],
-                                    "scheduler_mode": "rule-based",
-                                    "timestamp": datetime.now().isoformat()
-                                }
-                            )
+                                
+                                await hass.states.async_set(
+                                    entity_id,
+                                    schedule_value,
+                                    attributes={
+                                        "schedule": schedule[d].tolist() if hasattr(schedule[d], 'tolist') else schedule[d],
+                                        "scheduler_mode": "rule-based",
+                                        "timestamp": datetime.now().isoformat()
+                                    }
+                                )
                     
                     await hass.states.async_set(
                         "sensor.genetic_algorithm_status",
@@ -216,7 +224,9 @@ async def async_register_services(hass: HomeAssistant):
                         config_updates[param] = call.data[param]
                 
                 if config_updates:
-                    genetic_algo.pricing_calculator.update_config(config_updates)
+                    # Update config asynchronously if possible
+                    if hasattr(genetic_algo.pricing_calculator, 'update_config'):
+                        genetic_algo.pricing_calculator.update_config(config_updates)
                     _LOGGER.info(f"Updated pricing parameters: {config_updates}")
                     
                     # Update sensor state
@@ -236,6 +246,7 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error updating pricing parameters: {e}")
 
+    # Register services
     hass.services.async_register(DOMAIN, "run_optimization", handle_run_optimization)
     hass.services.async_register(DOMAIN, "start_optimization", handle_start_optimization)
     hass.services.async_register(DOMAIN, "stop_optimization", handle_stop_optimization)

@@ -17,6 +17,39 @@ CONF_USE_INDEXED_PRICING = "use_indexed_pricing"
 CONF_OPTIMIZATION_MODE = "optimization_mode"
 CONF_UPDATE_INTERVAL = "update_interval"
 
+# Entity configuration keys
+CONF_PV_FORECAST_TODAY = "pv_forecast_today"
+CONF_PV_FORECAST_TOMORROW = "pv_forecast_tomorrow"
+CONF_LOAD_FORECAST = "load_forecast"
+CONF_LOAD_SENSOR = "load_sensor"
+CONF_BATTERY_SOC = "battery_soc"
+CONF_MARKET_PRICE = "market_price"
+CONF_GRID_EXPORT_LIMIT = "grid_export_limit"
+CONF_DEMAND_RESPONSE = "demand_response"
+CONF_CARBON_INTENSITY = "carbon_intensity"
+CONF_WEATHER = "weather"
+CONF_EV_CHARGER = "ev_charger"
+CONF_SMART_THERMOSTAT = "smart_thermostat"
+CONF_SMART_PLUG = "smart_plug"
+CONF_LIGHTING = "lighting"
+CONF_MEDIA_PLAYER = "media_player"
+
+# Pricing configuration keys
+CONF_FIXED_PERCENTAGE = "fixed_percentage"
+CONF_QUALITY_COMPONENT = "quality_component"
+CONF_TRANSMISSION_TARIFF = "transmission_tariff"
+CONF_MFRR = "mfrr"
+CONF_VAT = "vat"
+CONF_CURRENCY_CONVERSION = "currency_conversion"
+CONF_PEAK_HOURS = "peak_hours"
+CONF_OFF_PEAK_HOURS = "off_peak_hours"
+CONF_PEAK_MULTIPLIER = "peak_multiplier"
+CONF_OFF_PEAK_MULTIPLIER = "off_peak_multiplier"
+CONF_SHOULDER_MULTIPLIER = "shoulder_multiplier"
+CONF_SUMMER_MONTHS = "summer_months"
+CONF_SUMMER_ADJUSTMENT = "summer_adjustment"
+CONF_WINTER_ADJUSTMENT = "winter_adjustment"
+
 # Entity mapping keys
 CONF_PV_FORECAST_ENTITY = "pv_forecast_entity"
 CONF_LOAD_FORECAST_ENTITY = "load_forecast_entity"
@@ -45,11 +78,11 @@ DEFAULT_UPDATE_INTERVAL = 15
 # Default entity IDs to avoid warnings
 DEFAULT_ENTITIES = {
     "pv_forecast_today": "sensor.solcast_pv_forecast_today",
-    "pv_forecast_tomorrow": "sensor.solcast_pv_forecast_tomorrow",
+    "pv_forecast_tomorrow": "sensor.solcast_pv_forecast_previsao_para_amanha",
     "load_forecast": "sensor.load_forecast",
     "load_sensor": "sensor.power_consumption",
     "battery_soc": "sensor.battery_soc",
-    "market_price": "sensor.omie_electricity_price",
+    "market_price": "sensor.omie_spot_price_pt",
     "grid_export_limit": "sensor.grid_export_limit",
     "demand_response": "binary_sensor.demand_response_active",
     "carbon_intensity": "sensor.carbon_intensity",
