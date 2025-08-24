@@ -1,0 +1,9 @@
+name: Genetic Load Manager
+description: AI-powered home energy load optimization using genetic algorithms
+category: Integration
+domain: genetic_load_manager
+homeassistant: 2023.8.0
+iot_class: Local Push
+country: PT
+documentation: https://github.com/FilipeDoria/genetic-load-manager
+issue_tracker: https://github.com/FilipeDoria/genetic-load-manager/issues

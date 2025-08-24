@@ -1,14 +1,14 @@
 {
   "domain": "genetic_load_manager",
   "name": "Genetic Load Manager",
-  "documentation": "https://github.com/yourusername/genetic-load-manager",
+  "documentation": "https://github.com/FilipeDoria/genetic-load-manager",
   "dependencies": [
     "recorder",
     "energy",
     "utility_meter"
   ],
   "codeowners": [
-    "@yourusername"
+    "@FilipeDoria"
   ],
   "requirements": [
     "numpy>=1.21.0",
@@ -24,6 +24,6 @@
   "mqtt": [],
   "bluetooth": [],
   "usb": [],
-  "issue_tracker": "https://github.com/yourusername/genetic-load-manager/issues",
+  "issue_tracker": "https://github.com/FilipeDoria/genetic-load-manager/issues",
   "quality_scale": "platinum"
 } 
