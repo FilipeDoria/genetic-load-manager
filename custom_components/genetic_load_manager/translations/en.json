@@ -2,32 +2,320 @@
   "config": {
     "step": {
       "user": {
-        "title": "Genetic Load Manager Configuration",
-        "description": "Configure the genetic algorithm load optimization system with Solcast integration",
+        "title": "Genetic Load Manager Setup",
+        "description": "Configure the basic optimization settings",
         "data": {
-          "preset": "Optimization Strategy",
-          "pv_forecast_entity": "Solcast PV Forecast for Today",
-          "pv_forecast_tomorrow_entity": "Solcast PV Forecast for Tomorrow",
+          "optimization_mode": "Optimization Mode",
+          "update_interval": "Update Interval (minutes)",
+          "use_indexed_pricing": "Use Indexed Tariff Pricing"
+        }
+      },
+      "algorithm_params": {
+        "title": "Genetic Algorithm Parameters",
+        "description": "Configure the genetic algorithm settings",
+        "data": {
+          "population_size": "Population Size",
+          "generations": "Number of Generations",
+          "mutation_rate": "Mutation Rate",
+          "crossover_rate": "Crossover Rate",
+          "num_devices": "Number of Devices"
+        }
+      },
+      "device_config": {
+        "title": "Device Configuration",
+        "description": "Configure battery and device parameters",
+        "data": {
+          "battery_capacity": "Battery Capacity (kWh)",
+          "max_charge_rate": "Max Charge Rate (kW)",
+          "max_discharge_rate": "Max Discharge Rate (kW)",
+          "binary_control": "Use Binary Control"
+        }
+      },
+      "entity_mapping": {
+        "title": "Entity Mapping",
+        "description": "Map Home Assistant entities to the optimizer",
+        "data": {
+          "pv_forecast_entity": "PV Forecast Entity",
           "load_forecast_entity": "Load Forecast Entity",
-          "battery_soc_entity": "Battery State of Charge Entity",
-          "dynamic_pricing_entity": "Dynamic Pricing Entity",
-          "num_devices": "Number of Manageable Devices",
-          "population_size": "Population Size (overrides preset)",
-          "generations": "Number of Generations (overrides preset)",
-          "mutation_rate": "Mutation Rate (overrides preset)",
-          "crossover_rate": "Crossover Rate (overrides preset)",
-          "battery_capacity": "Battery Capacity in kWh (overrides preset)",
-          "max_charge_rate": "Maximum Charge Rate in kW (overrides preset)",
-          "max_discharge_rate": "Maximum Discharge Rate in kW (overrides preset)",
-          "binary_control": "Binary Control Mode"
+          "battery_soc_entity": "Battery State of Charge",
+          "grid_import_entity": "Grid Import Power",
+          "grid_export_entity": "Grid Export Power",
+          "solar_power_entity": "Solar Power",
+          "electricity_price_entity": "Electricity Price",
+          "weather_entity": "Weather Entity"
         }
       }
     },
-    "preset": {
-      "balanced": "Balanced - Optimizes cost, solar usage, and battery life",
-      "cost-focused": "Cost-Focused - Prioritizes cost savings with aggressive battery usage",
-      "battery-preserving": "Battery-Preserving - Conservative approach to maximize battery lifespan",
-      "solar-optimized": "Solar-Optimized - Maximizes solar energy utilization"
+    "error": {
+      "invalid_config": "Invalid configuration",
+      "entity_not_found": "Entity not found",
+      "optimization_failed": "Optimization failed",
+      "insufficient_data": "Insufficient data for optimization",
+      "battery_constraints": "Battery constraints violated",
+      "device_constraints": "Device constraints violated"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Genetic Load Manager Options",
+        "description": "Update the integration settings",
+        "data": {
+          "update_interval": "Update Interval (minutes)",
+          "optimization_mode": "Optimization Mode"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "genetic_load_manager_optimization_status": {
+        "name": "Optimization Status"
+      },
+      "genetic_load_manager_current_fitness": {
+        "name": "Current Fitness"
+      },
+      "genetic_load_manager_best_fitness": {
+        "name": "Best Fitness"
+      },
+      "genetic_load_manager_generation": {
+        "name": "Current Generation"
+      },
+      "genetic_load_manager_devices_optimized": {
+        "name": "Devices Optimized"
+      },
+      "genetic_load_manager_energy_savings": {
+        "name": "Energy Savings"
+      },
+      "genetic_load_manager_cost_savings": {
+        "name": "Cost Savings"
+      },
+      "genetic_load_manager_carbon_reduction": {
+        "name": "Carbon Reduction"
+      },
+      "genetic_load_manager_last_optimization": {
+        "name": "Last Optimization"
+      },
+      "genetic_load_manager_next_optimization": {
+        "name": "Next Optimization"
+      }
+    },
+    "switch": {
+      "genetic_load_manager_optimization": {
+        "name": "Optimization Control"
+      }
+    }
+  },
+  "services": {
+    "start_optimization": {
+      "name": "Start Optimization",
+      "description": "Start the genetic algorithm optimization process",
+      "fields": {
+        "optimization_mode": {
+          "name": "Optimization Mode",
+          "description": "The optimization strategy to use"
+        },
+        "duration_hours": {
+          "name": "Duration (Hours)",
+          "description": "How long to run the optimization (0 = continuous)"
+        }
+      }
+    },
+    "stop_optimization": {
+      "name": "Stop Optimization",
+      "description": "Stop the currently running optimization process"
+    },
+    "pause_optimization": {
+      "name": "Pause Optimization",
+      "description": "Pause the currently running optimization process"
+    },
+    "resume_optimization": {
+      "name": "Resume Optimization",
+      "description": "Resume a paused optimization process"
+    },
+    "run_single_optimization": {
+      "name": "Run Single Optimization",
+      "description": "Run a single optimization cycle and return results",
+      "fields": {
+        "optimization_mode": {
+          "name": "Optimization Mode",
+          "description": "The optimization strategy to use for this run"
+        },
+        "max_time_seconds": {
+          "name": "Maximum Time (Seconds)",
+          "description": "Maximum time to spend on this optimization"
+        }
+      }
+    },
+    "update_parameters": {
+      "name": "Update Parameters",
+      "description": "Update the genetic algorithm parameters",
+      "fields": {
+        "population_size": {
+          "name": "Population Size",
+          "description": "Number of individuals in the population"
+        },
+        "generations": {
+          "name": "Generations",
+          "description": "Number of generations to evolve"
+        },
+        "mutation_rate": {
+          "name": "Mutation Rate",
+          "description": "Probability of mutation (0.01 to 0.5)"
+        },
+        "crossover_rate": {
+          "name": "Crossover Rate",
+          "description": "Probability of crossover (0.1 to 1.0)"
+        }
+      }
+    },
+    "update_device_config": {
+      "name": "Update Device Configuration",
+      "description": "Update the configuration for controllable devices",
+      "fields": {
+        "device_entity_id": {
+          "name": "Device Entity ID",
+          "description": "The entity ID of the device to configure"
+        },
+        "max_power": {
+          "name": "Maximum Power (kW)",
+          "description": "Maximum power consumption for this device"
+        },
+        "priority": {
+          "name": "Priority",
+          "description": "Priority level for this device (1 = highest, 5 = lowest)"
+        },
+        "controllable": {
+          "name": "Controllable",
+          "description": "Whether this device can be controlled by the optimizer"
+        }
+      }
+    },
+    "update_battery_config": {
+      "name": "Update Battery Configuration",
+      "description": "Update the battery system configuration",
+      "fields": {
+        "capacity": {
+          "name": "Capacity (kWh)",
+          "description": "Battery capacity in kilowatt-hours"
+        },
+        "max_charge_rate": {
+          "name": "Max Charge Rate (kW)",
+          "description": "Maximum battery charging rate"
+        },
+        "max_discharge_rate": {
+          "name": "Max Discharge Rate (kW)",
+          "description": "Maximum battery discharging rate"
+        },
+        "target_soc": {
+          "name": "Target State of Charge (%)",
+          "description": "Target battery state of charge"
+        }
+      }
+    },
+    "get_optimization_status": {
+      "name": "Get Optimization Status",
+      "description": "Get the current status and statistics of the optimization"
+    },
+    "get_optimization_history": {
+      "name": "Get Optimization History",
+      "description": "Get the history of optimization runs and results",
+      "fields": {
+        "days": {
+          "name": "Number of Days",
+          "description": "Number of days of history to retrieve"
+        },
+        "include_details": {
+          "name": "Include Details",
+          "description": "Whether to include detailed optimization data"
+        }
+      }
+    },
+    "export_optimization_data": {
+      "name": "Export Optimization Data",
+      "description": "Export optimization data to a file",
+      "fields": {
+        "format": {
+          "name": "Export Format",
+          "description": "The format to export the data in"
+        },
+        "include_raw_data": {
+          "name": "Include Raw Data",
+          "description": "Whether to include raw optimization data"
+        },
+        "filename": {
+          "name": "Filename",
+          "description": "Custom filename for the export (optional)"
+        }
+      }
+    },
+    "import_optimization_data": {
+      "name": "Import Optimization Data",
+      "description": "Import optimization data from a file",
+      "fields": {
+        "file_path": {
+          "name": "File Path",
+          "description": "Path to the file to import"
+        },
+        "merge_existing": {
+          "name": "Merge with Existing",
+          "description": "Whether to merge with existing data or replace it"
+        }
+      }
+    },
+    "reset_optimization_data": {
+      "name": "Reset Optimization Data",
+      "description": "Reset all optimization data and start fresh",
+      "fields": {
+        "confirm": {
+          "name": "Confirm Reset",
+          "description": "Type 'RESET' to confirm you want to reset all data"
+        }
+      }
+    },
+    "test_optimization": {
+      "name": "Test Optimization",
+      "description": "Run a test optimization with current settings",
+      "fields": {
+        "test_scenario": {
+          "name": "Test Scenario",
+          "description": "The scenario to test"
+        },
+        "duration_hours": {
+          "name": "Duration (Hours)",
+          "description": "How long to simulate"
+        }
+      }
+    }
+  },
+  "state": {
+    "idle": "Idle",
+    "optimizing": "Optimizing",
+    "paused": "Paused",
+    "error": "Error"
+  },
+  "optimization_mode": {
+    "cost_savings": "Cost Savings",
+    "comfort": "Comfort",
+    "battery_health": "Battery Health",
+    "grid_stability": "Grid Stability",
+    "carbon_reduction": "Carbon Reduction"
+  },
+  "test_scenario": {
+    "normal_day": "Normal Day",
+    "high_solar": "High Solar Production",
+    "low_solar": "Low Solar Production",
+    "peak_pricing": "Peak Pricing",
+    "off_peak_pricing": "Off-Peak Pricing",
+    "battery_low": "Low Battery",
+    "battery_high": "High Battery"
+  },
+  "export_format": {
+    "json": "JSON",
+    "csv": "CSV",
+    "excel": "Excel"
   }
 } 

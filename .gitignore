@@ -1,0 +1,101 @@
+# Development Environment
+development/venv/
+development/__pycache__/
+development/*.pyc
+development/*.pyo
+development/*.pyd
+development/.Python
+development/pip-log.txt
+development/pip-delete-this-directory.txt
+development/.tox/
+development/.coverage
+development/.pytest_cache/
+development/htmlcov/
+development/.mypy_cache/
+development/.dmypy.json
+development/dmypy.json
+
+# Test Results and Data
+development/testing/*.png
+development/testing/*.jpg
+development/testing/*.jpeg
+development/testing/*.gif
+development/testing/*.svg
+development/testing/results/
+development/testing/logs/
+development/testing/data/
+
+# Research Files
+development/research/*.xlsx
+development/research/*.csv
+development/research/*.json
+development/research/plots/
+development/research/data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Configuration (keep only templates)
+config.local.yaml
+secrets.yaml
+*.local.yaml
+
+# Keep important files
+!development/README.md
+!development/requirements.txt
+!development/documentation/*.md
+!development/testing/*.py
+!development/testing/README.md

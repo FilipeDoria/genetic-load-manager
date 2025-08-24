@@ -1,304 +1,307 @@
-# Services for Genetic Load Manager
-
-run_optimization:
-  description: Triggers the genetic algorithm to optimize the load schedule immediately.
-  fields:
-    population_size:
-      description: Number of individuals in the population.
-      example: 100
-    generations:
-      description: Number of generations to run.
-      example: 200
-    mutation_rate:
-      description: Probability of mutation.
-      example: 0.05
-    crossover_rate:
-      description: Probability of crossover.
-      example: 0.8
+# Services for Genetic Load Manager integration
 
 start_optimization:
-  description: Starts the periodic optimization process (every 15 minutes).
+  name: Start Optimization
+  description: Start the genetic algorithm optimization process
+  fields:
+    optimization_mode:
+      name: Optimization Mode
+      description: The optimization strategy to use
+      selector:
+        select:
+          options:
+            - cost_savings
+            - comfort
+            - battery_health
+            - grid_stability
+            - carbon_reduction
+          default: cost_savings
+    duration_hours:
+      name: Duration (Hours)
+      description: How long to run the optimization (0 = continuous)
+      selector:
+        number:
+          min: 0
+          max: 24
+          step: 0.5
+          default: 0
+          unit_of_measurement: hours
 
 stop_optimization:
-  description: Stops the periodic optimization process.
-
-toggle_scheduler:
-  description: Switches between genetic algorithm and rule-based scheduling.
-  fields:
-    mode:
-      description: Scheduler mode to use.
-      example: "genetic"
-      selector:
-        select:
-          options: ["genetic", "rule-based"]
-          default: "genetic"
-
-optimize_loads:
-  name: "Optimize Loads"
-  description: "Trigger manual load optimization using genetic algorithm"
-  fields:
-    force:
-      name: "Force Optimization"
-      description: "Force optimization even if recently run"
-      selector:
-        boolean:
-          default: false
-    generations:
-      name: "Generations"
-      description: "Number of generations for this optimization run"
-      selector:
-        number:
-          min: 10
-          max: 500
-          default: 100
-          unit_of_measurement: "generations"
-
-apply_schedule:
-  name: "Apply Schedule"
-  description: "Apply the current optimized schedule to loads"
-  fields:
-    schedule_id:
-      name: "Schedule ID"
-      description: "ID of the schedule to apply (optional)"
-      selector:
-        text:
-          default: "current"
-    confirm:
-      name: "Confirm Action"
-      description: "Confirm that you want to apply this schedule"
-      selector:
-        boolean:
-          default: false
-
-reset_optimization:
-  name: "Reset Optimization"
-  description: "Reset optimization statistics and schedule"
-  fields:
-    confirm:
-      name: "Confirm Reset"
-      description: "Confirm that you want to reset optimization"
-      selector:
-        boolean:
-          default: false
-
-control_load:
-  name: "Control Load"
-  description: "Directly control a specific load"
-  fields:
-    entity_id:
-      name: "Entity ID"
-      description: "The entity ID of the load to control"
-      selector:
-        entity:
-          domain: switch
-          multiple: false
-    action:
-      name: "Action"
-      description: "Action to perform on the load"
-      selector:
-        select:
-          options:
-            - turn_on
-            - turn_off
-            - toggle
-          default: turn_on
-    priority:
-      name: "Priority"
-      description: "Priority level for this control action"
-      selector:
-        select:
-          options:
-            - low
-            - normal
-            - high
-            - critical
-          default: normal
-
-get_optimization_status:
-  name: "Get Optimization Status"
-  description: "Get current optimization status and statistics"
+  name: Stop Optimization
+  description: Stop the currently running optimization process
   fields: {}
 
-get_algorithm_logs:
-  name: "Get Algorithm Logs"
-  description: "Get genetic algorithm optimization logs"
+pause_optimization:
+  name: Pause Optimization
+  description: Pause the currently running optimization process
+  fields: {}
+
+resume_optimization:
+  name: Resume Optimization
+  description: Resume a paused optimization process
+  fields: {}
+
+run_single_optimization:
+  name: Run Single Optimization
+  description: Run a single optimization cycle and return results
   fields:
-    level:
-      name: "Log Level"
-      description: "Filter logs by level"
+    optimization_mode:
+      name: Optimization Mode
+      description: The optimization strategy to use for this run
       selector:
         select:
           options:
-            - all
-            - DEBUG
-            - INFO
-            - WARNING
-            - ERROR
-          default: all
-    limit:
-      name: "Log Limit"
-      description: "Maximum number of log entries to return"
+            - cost_savings
+            - comfort
+            - battery_health
+            - grid_stability
+            - carbon_reduction
+          default: cost_savings
+    max_time_seconds:
+      name: Maximum Time (Seconds)
+      description: Maximum time to spend on this optimization
       selector:
         number:
-          min: 1
-          max: 100
-          default: 50
-          unit_of_measurement: "entries"
+          min: 30
+          max: 600
+          step: 30
+          default: 300
+          unit_of_measurement: seconds
 
-update_manageable_loads:
-  name: "Update Manageable Loads"
-  description: "Scan and update the list of manageable loads"
-  fields:
-    scan_switches:
-      name: "Scan Switch Entities"
-      description: "Scan for new switch entities"
-      selector:
-        boolean:
-          default: true
-    scan_lights:
-      name: "Scan Light Entities"
-      description: "Scan for light entities that can be controlled"
-      selector:
-        boolean:
-          default: false
-    custom_loads:
-      name: "Custom Loads"
-      description: "List of custom entity IDs to include"
-      selector:
-        target:
-          entity:
-            domain: switch
-            multiple: true
-
-set_optimization_parameters:
-  name: "Set Optimization Parameters"
-  description: "Update genetic algorithm parameters"
+update_parameters:
+  name: Update Parameters
+  description: Update the genetic algorithm parameters
   fields:
     population_size:
-      name: "Population Size"
-      description: "Number of individuals in the population"
+      name: Population Size
+      description: Number of individuals in the population
       selector:
         number:
-          min: 10
-          max: 200
-          default: 50
-          unit_of_measurement: "individuals"
-    generations:
-      name: "Generations"
-      description: "Number of generations per optimization"
-      selector:
-        number:
-          min: 10
+          min: 20
           max: 500
+          step: 10
           default: 100
-          unit_of_measurement: "generations"
+    generations:
+      name: Generations
+      description: Number of generations to evolve
+      selector:
+        number:
+          min: 50
+          max: 1000
+          step: 50
+          default: 200
     mutation_rate:
-      name: "Mutation Rate"
-      description: "Probability of mutation per gene"
+      name: Mutation Rate
+      description: Probability of mutation (0.01 to 0.5)
       selector:
         number:
           min: 0.01
           max: 0.5
-          default: 0.1
           step: 0.01
+          default: 0.05
     crossover_rate:
-      name: "Crossover Rate"
-      description: "Probability of crossover between parents"
+      name: Crossover Rate
+      description: Probability of crossover (0.1 to 1.0)
       selector:
         number:
           min: 0.1
           max: 1.0
+          step: 0.05
           default: 0.8
-          step: 0.1
 
-export_schedule:
-  name: "Export Schedule"
-  description: "Export the current optimized schedule"
+update_device_config:
+  name: Update Device Configuration
+  description: Update the configuration for controllable devices
+  fields:
+    device_entity_id:
+      name: Device Entity ID
+      description: The entity ID of the device to configure
+      selector:
+        entity:
+          domain:
+            - switch
+            - climate
+            - light
+            - media_player
+            - fan
+            - humidifier
+            - dehumidifier
+    max_power:
+      name: Maximum Power (kW)
+      description: Maximum power consumption for this device
+      selector:
+        number:
+          min: 0.1
+          max: 20.0
+          step: 0.1
+          unit_of_measurement: kW
+    priority:
+      name: Priority
+      description: Priority level for this device (1 = highest, 5 = lowest)
+      selector:
+        select:
+          options:
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+          default: "3"
+    controllable:
+      name: Controllable
+      description: Whether this device can be controlled by the optimizer
+      selector:
+        boolean:
+          default: true
+
+update_battery_config:
+  name: Update Battery Configuration
+  description: Update the battery system configuration
+  fields:
+    capacity:
+      name: Capacity (kWh)
+      description: Battery capacity in kilowatt-hours
+      selector:
+        number:
+          min: 1.0
+          max: 100.0
+          step: 0.5
+          unit_of_measurement: kWh
+    max_charge_rate:
+      name: Max Charge Rate (kW)
+      description: Maximum battery charging rate
+      selector:
+        number:
+          min: 0.5
+          max: 50.0
+          step: 0.5
+          unit_of_measurement: kW
+    max_discharge_rate:
+      name: Max Discharge Rate (kW)
+      description: Maximum battery discharging rate
+      selector:
+        number:
+          min: 0.5
+          max: 50.0
+          step: 0.5
+          unit_of_measurement: kW
+    target_soc:
+      name: Target State of Charge (%)
+      description: Target battery state of charge
+      selector:
+        number:
+          min: 20
+          max: 95
+          step: 5
+          unit_of_measurement: "%"
+
+get_optimization_status:
+  name: Get Optimization Status
+  description: Get the current status and statistics of the optimization
+  fields: {}
+
+get_optimization_history:
+  name: Get Optimization History
+  description: Get the history of optimization runs and results
+  fields:
+    days:
+      name: Number of Days
+      description: Number of days of history to retrieve
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 1
+          default: 7
+          unit_of_measurement: days
+    include_details:
+      name: Include Details
+      description: Whether to include detailed optimization data
+      selector:
+        boolean:
+          default: false
+
+export_optimization_data:
+  name: Export Optimization Data
+  description: Export optimization data to a file
   fields:
     format:
-      name: "Export Format"
-      description: "Format for the exported schedule"
+      name: Export Format
+      description: The format to export the data in
       selector:
         select:
           options:
             - json
             - csv
-            - yaml
+            - excel
           default: json
-    include_metadata:
-      name: "Include Metadata"
-      description: "Include optimization metadata in export"
+    include_raw_data:
+      name: Include Raw Data
+      description: Whether to include raw optimization data
+      selector:
+        boolean:
+          default: false
+    filename:
+      name: Filename
+      description: Custom filename for the export (optional)
+      selector:
+        text:
+          placeholder: optimization_export
+
+import_optimization_data:
+  name: Import Optimization Data
+  description: Import optimization data from a file
+  fields:
+    file_path:
+      name: File Path
+      description: Path to the file to import
+      selector:
+        text:
+          placeholder: /config/genetic_load_manager/export.json
+    merge_existing:
+      name: Merge with Existing
+      description: Whether to merge with existing data or replace it
       selector:
         boolean:
           default: true
 
-update_pricing_parameters:
-  name: "Update Pricing Parameters"
-  description: "Update indexed tariff pricing parameters"
+reset_optimization_data:
+  name: Reset Optimization Data
+  description: Reset all optimization data and start fresh
   fields:
-    mfrr:
-      name: "Frequency Restoration Reserve"
-      description: "MFRR component in €/MWh"
+    confirm:
+      name: Confirm Reset
+      description: Type 'RESET' to confirm you want to reset all data
+      selector:
+        text:
+          placeholder: RESET
+
+test_optimization:
+  name: Test Optimization
+  description: Run a test optimization with current settings
+  fields:
+    test_scenario:
+      name: Test Scenario
+      description: The scenario to test
+      selector:
+        select:
+          options:
+            - normal_day
+            - high_solar
+            - low_solar
+            - peak_pricing
+            - off_peak_pricing
+            - battery_low
+            - battery_high
+          default: normal_day
+    duration_hours:
+      name: Duration (Hours)
+      description: How long to simulate
       selector:
         number:
-          min: 0.0
-          max: 10.0
-          default: 1.94
-          step: 0.01
-          unit_of_measurement: "€/MWh"
-    q:
-      name: "Quality Component"
-      description: "Quality component in €/MWh"
-      selector:
-        number:
-          min: 0.0
-          max: 100.0
-          default: 30.0
-          step: 0.1
-          unit_of_measurement: "€/MWh"
-    fp:
-      name: "Fixed Percentage"
-      description: "Fixed percentage multiplier"
-      selector:
-        number:
-          min: 1.0
-          max: 2.0
-          default: 1.1674
-          step: 0.0001
-    tae:
-      name: "Transmission Tariff"
-      description: "Transmission and distribution tariff in €/MWh"
-      selector:
-        number:
-          min: 0.0
-          max: 200.0
-          default: 60.0
-          step: 0.1
-          unit_of_measurement: "€/MWh"
-    vat:
-      name: "VAT Multiplier"
-      description: "VAT multiplier (1.23 = 23%)"
-      selector:
-        number:
-          min: 1.0
-          max: 1.5
-          default: 1.23
-          step: 0.01
-    peak_multiplier:
-      name: "Peak Hours Multiplier"
-      description: "Price multiplier for peak hours"
-      selector:
-        number:
-          min: 1.0
-          max: 2.0
-          default: 1.2
-          step: 0.1
-    off_peak_multiplier:
-      name: "Off-Peak Hours Multiplier"
-      description: "Price multiplier for off-peak hours"
-      selector:
-        number:
-          min: 0.5
-          max: 1.0
-          default: 0.8
-          step: 0.1 
+          min: 1
+          max: 24
+          step: 1
+          default: 24
+          unit_of_measurement: hours 

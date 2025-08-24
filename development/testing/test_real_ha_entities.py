@@ -639,6 +639,668 @@ def create_realistic_ha_entities() -> Dict[str, MockHAEntity]:
                 'Tomorrow_average': 52.13,
                 'Tomorrow_hours': {}
             }
+        ),
+        
+        # Additional Energy Storage Entities
+        'sensor.battery_voltage_01': MockHAEntity(
+            'sensor.battery_voltage_01',
+            '48.5',
+            {
+                'friendly_name': 'Battery Voltage',
+                'unit_of_measurement': 'V',
+                'icon': 'mdi:battery',
+                'device_class': 'voltage',
+                'state_class': 'measurement',
+                'min': 40.0,
+                'max': 58.0,
+                'battery_level': 65,
+                'battery_charging': False
+            }
+        ),
+        
+        'sensor.battery_current_01': MockHAEntity(
+            'sensor.battery_current_01',
+            '2.1',
+            {
+                'friendly_name': 'Battery Current',
+                'unit_of_measurement': 'A',
+                'icon': 'mdi:current-ac',
+                'device_class': 'current',
+                'state_class': 'measurement',
+                'min': -50.0,
+                'max': 50.0,
+                'battery_charging': False
+            }
+        ),
+        
+        'sensor.battery_temperature_01': MockHAEntity(
+            'sensor.battery_temperature_01',
+            '25.0',
+            {
+                'friendly_name': 'Battery Temperature',
+                'unit_of_measurement': '°C',
+                'icon': 'mdi:thermometer',
+                'device_class': 'temperature',
+                'state_class': 'measurement',
+                'min': -10.0,
+                'max': 60.0
+            }
+        ),
+        
+        # Smart Home Energy Management Entities
+        'sensor.home_energy_usage_today': MockHAEntity(
+            'sensor.home_energy_usage_today',
+            '45.2',
+            {
+                'friendly_name': 'Home Energy Usage Today',
+                'unit_of_measurement': 'kWh',
+                'icon': 'mdi:lightning-bolt',
+                'device_class': 'energy',
+                'state_class': 'total_increasing',
+                'last_reset': '2025-01-20T00:00:00+00:00',
+                'cost_today': 6.78,  # EUR
+                'cost_unit': 'EUR/kWh'
+            }
+        ),
+        
+        'sensor.home_energy_cost_today': MockHAEntity(
+            'sensor.home_energy_cost_today',
+            '6.78',
+            {
+                'friendly_name': 'Home Energy Cost Today',
+                'unit_of_measurement': 'EUR',
+                'icon': 'mdi:currency-eur',
+                'device_class': 'monetary',
+                'state_class': 'total_increasing',
+                'last_reset': '2025-01-20T00:00:00+00:00',
+                'energy_today': 45.2,  # kWh
+                'avg_price_today': 0.15  # EUR/kWh
+            }
+        ),
+        
+        # EV Charging Specific Entities
+        'sensor.ev_battery_level_01': MockHAEntity(
+            'sensor.ev_battery_level_01',
+            '45.0',
+            {
+                'friendly_name': 'EV Battery Level',
+                'unit_of_measurement': '%',
+                'icon': 'mdi:car-battery',
+                'device_class': 'battery',
+                'state_class': 'measurement',
+                'min': 0,
+                'max': 100,
+                'battery_charging': True,
+                'estimated_range': 180,  # km
+                'max_range': 400,  # km
+                'target_soc': 80.0  # %
+            }
+        ),
+        
+        'sensor.ev_charging_rate_01': MockHAEntity(
+            'sensor.ev_charging_rate_01',
+            '3.7',
+            {
+                'friendly_name': 'EV Charging Rate',
+                'unit_of_measurement': 'kW',
+                'icon': 'mdi:ev-station',
+                'device_class': 'power',
+                'state_class': 'measurement',
+                'min': 0.0,
+                'max': 7.4,  # Max AC charging rate
+                'charging_mode': 'AC',
+                'connector_type': 'Type 2',
+                'phase_count': 1
+            }
+        ),
+        
+        'sensor.ev_charging_time_remaining_01': MockHAEntity(
+            'sensor.ev_charging_time_remaining_01',
+            '2.5',
+            {
+                'friendly_name': 'EV Charging Time Remaining',
+                'unit_of_measurement': 'h',
+                'icon': 'mdi:clock-outline',
+                'device_class': 'duration',
+                'state_class': 'measurement',
+                'target_soc': 80.0,
+                'current_soc': 45.0,
+                'charging_rate': 3.7
+            }
+        ),
+        
+        # Smart Appliance Entities
+        'switch.dishwasher_01': MockHAEntity(
+            'switch.dishwasher_01',
+            'off',
+            {
+                'friendly_name': 'Dishwasher',
+                'icon': 'mdi:dishwasher',
+                'assumed_state': False,
+                'supported_features': 0,
+                'power': 0.0,  # kW
+                'current': 0.0,  # A
+                'voltage': 230.0,  # V
+                'program': 'eco',
+                'remaining_time': 0,  # minutes
+                'energy_today': 2.1,  # kWh
+                'energy_total': 210.5,  # kWh
+                'water_consumption': 0.0,  # L
+                'detergent_level': 'full'
+            }
+        ),
+        
+        'switch.washing_machine_01': MockHAEntity(
+            'switch.washing_machine_01',
+            'off',
+            {
+                'friendly_name': 'Washing Machine',
+                'icon': 'mdi:washing-machine',
+                'assumed_state': False,
+                'supported_features': 0,
+                'power': 0.0,  # kW
+                'current': 0.0,  # A
+                'voltage': 230.0,  # V
+                'program': 'cotton',
+                'temperature': 40,  # °C
+                'spin_speed': 1200,  # rpm
+                'remaining_time': 0,  # minutes
+                'energy_today': 1.8,  # kWh
+                'energy_total': 180.3,  # kWh
+                'water_consumption': 0.0,  # L
+                'detergent_level': 'medium'
+            }
+        ),
+        
+        'switch.dryer_01': MockHAEntity(
+            'switch.dryer_01',
+            'off',
+            {
+                'friendly_name': 'Dryer',
+                'icon': 'mdi:tumble-dryer',
+                'assumed_state': False,
+                'supported_features': 0,
+                'power': 0.0,  # kW
+                'current': 0.0,  # A
+                'voltage': 230.0,  # V
+                'program': 'cotton',
+                'temperature': 60,  # °C
+                'remaining_time': 0,  # minutes
+                'energy_today': 3.2,  # kWh
+                'energy_total': 320.7,  # kWh
+                'moisture_level': 'dry'
+            }
+        ),
+        
+        # Smart Lighting and Entertainment
+        'light.living_room_main_01': MockHAEntity(
+            'light.living_room_main_01',
+            'on',
+            {
+                'friendly_name': 'Living Room Main Light',
+                'icon': 'mdi:ceiling-light',
+                'assumed_state': False,
+                'supported_features': 44,
+                'brightness': 255,
+                'color_temp': 2700,
+                'rgb_color': [255, 255, 255],
+                'hs_color': [0, 0],
+                'white_value': 255,
+                'effect': 'None',
+                'power': 0.08,  # kW
+                'energy_today': 0.5,  # kWh
+                'energy_total': 50.2  # kWh
+            }
+        ),
+        
+        'media_player.living_room_tv_01': MockHAEntity(
+            'media_player.living_room_tv_01',
+            'idle',
+            {
+                'friendly_name': 'Living Room TV',
+                'icon': 'mdi:television',
+                'assumed_state': False,
+                'supported_features': 21439,
+                'media_title': 'Netflix',
+                'media_artist': 'Movie Title',
+                'media_content_type': 'movie',
+                'media_duration': 7200,  # seconds
+                'media_position': 1800,  # seconds
+                'volume_level': 0.5,
+                'is_volume_muted': False,
+                'source': 'HDMI1',
+                'power': 0.12,  # kW
+                'energy_today': 2.8,  # kWh
+                'energy_total': 280.5  # kWh
+            }
+        ),
+        
+        # Smart Home Hub and Network
+        'device_tracker.smartphone_01': MockHAEntity(
+            'device_tracker.smartphone_01',
+            'home',
+            {
+                'friendly_name': 'Smartphone',
+                'icon': 'mdi:cellphone',
+                'source_type': 'gps',
+                'gps_accuracy': 5,
+                'latitude': 38.7223,
+                'longitude': -9.1393,
+                'altitude': 15,
+                'battery_level': 78,
+                'battery_charging': False,
+                'last_seen': '2025-01-20T10:30:00+00:00'
+            }
+        ),
+        
+        'device_tracker.car_01': MockHAEntity(
+            'device_tracker.car_01',
+            'home',
+            {
+                'friendly_name': 'Car',
+                'icon': 'mdi:car',
+                'source_type': 'gps',
+                'gps_accuracy': 10,
+                'latitude': 38.7223,
+                'longitude': -9.1393,
+                'altitude': 15,
+                'battery_level': 85,
+                'battery_charging': False,
+                'last_seen': '2025-01-20T10:25:00+00:00',
+                'estimated_range': 320  # km
+            }
+        ),
+        
+        # Additional Monitoring and Control Entities
+        'sensor.grid_frequency_01': MockHAEntity(
+            'sensor.grid_frequency_01',
+            '50.02',
+            {
+                'friendly_name': 'Grid Frequency',
+                'unit_of_measurement': 'Hz',
+                'icon': 'mdi:sine-wave',
+                'device_class': 'frequency',
+                'state_class': 'measurement',
+                'min': 49.5,
+                'max': 50.5,
+                'grid_stability': 'stable'
+            }
+        ),
+        
+        'sensor.grid_voltage_l1_01': MockHAEntity(
+            'sensor.grid_voltage_l1_01',
+            '230.5',
+            {
+                'friendly_name': 'Grid Voltage L1',
+                'unit_of_measurement': 'V',
+                'icon': 'mdi:lightning-bolt',
+                'device_class': 'voltage',
+                'state_class': 'measurement',
+                'min': 207.0,
+                'max': 253.0,
+                'phase': 'L1'
+            }
+        ),
+        
+        'sensor.grid_voltage_l2_01': MockHAEntity(
+            'sensor.grid_voltage_l2_01',
+            '229.8',
+            {
+                'friendly_name': 'Grid Voltage L2',
+                'unit_of_measurement': 'V',
+                'icon': 'mdi:lightning-bolt',
+                'device_class': 'voltage',
+                'state_class': 'measurement',
+                'min': 207.0,
+                'max': 253.0,
+                'phase': 'L2'
+            }
+        ),
+        
+        'sensor.grid_voltage_l3_01': MockHAEntity(
+            'sensor.grid_voltage_l3_01',
+            '230.2',
+            {
+                'friendly_name': 'Grid Voltage L3',
+                'unit_of_measurement': 'V',
+                'icon': 'mdi:lightning-bolt',
+                'device_class': 'voltage',
+                'state_class': 'measurement',
+                'min': 207.0,
+                'max': 253.0,
+                'phase': 'L3'
+            }
+        ),
+        
+        # Smart Thermostat Schedule Entities
+        'input_datetime.climate_schedule_morning_01': MockHAEntity(
+            'input_datetime.climate_schedule_morning_01',
+            '07:00:00',
+            {
+                'friendly_name': 'Climate Schedule Morning',
+                'icon': 'mdi:clock-outline',
+                'has_date': False,
+                'has_time': True,
+                'time': '07:00:00',
+                'temperature_target': 22.0
+            }
+        ),
+        
+        'input_datetime.climate_schedule_evening_01': MockHAEntity(
+            'input_datetime.climate_schedule_evening_01',
+            '18:00:00',
+            {
+                'friendly_name': 'Climate Schedule Evening',
+                'icon': 'mdi:clock-outline',
+                'has_date': False,
+                'has_time': True,
+                'time': '18:00:00',
+                'temperature_target': 20.0
+            }
+        ),
+        
+        'input_datetime.climate_schedule_night_01': MockHAEntity(
+            'input_datetime.climate_schedule_night_01',
+            '22:00:00',
+            {
+                'friendly_name': 'Climate Schedule Night',
+                'icon': 'mdi:clock-outline',
+                'has_date': False,
+                'has_time': True,
+                'time': '22:00:00',
+                'temperature_target': 18.0
+            }
+        ),
+        
+        # Energy Tariff and Billing Entities
+        'sensor.electricity_tariff_01': MockHAEntity(
+            'sensor.electricity_tariff_01',
+            'normal',
+            {
+                'friendly_name': 'Electricity Tariff',
+                'icon': 'mdi:currency-eur',
+                'tariff_type': 'time_of_use',
+                'current_period': 'normal',
+                'next_period': 'peak',
+                'next_period_time': '18:00:00',
+                'rates': {
+                    'off_peak': 0.12,  # EUR/kWh
+                    'normal': 0.15,    # EUR/kWh
+                    'peak': 0.22       # EUR/kWh
+                },
+                'current_rate': 0.15
+            }
+        ),
+        
+        'sensor.monthly_energy_bill_01': MockHAEntity(
+            'sensor.monthly_energy_bill_01',
+            '156.78',
+            {
+                'friendly_name': 'Monthly Energy Bill',
+                'unit_of_measurement': 'EUR',
+                'icon': 'mdi:receipt',
+                'device_class': 'monetary',
+                'state_class': 'total_increasing',
+                'billing_period': '2025-01',
+                'energy_consumed': 1045.2,  # kWh
+                'average_daily_cost': 5.23,  # EUR
+                'peak_usage_day': '2025-01-15',
+                'peak_usage_amount': 8.45  # EUR
+            }
+        ),
+        
+        # Load Forecasting and Historical Data
+        'sensor.load_forecast_24h_01': MockHAEntity(
+            'sensor.load_forecast_24h_01',
+            '2.1',
+            {
+                'friendly_name': 'Load Forecast 24h',
+                'unit_of_measurement': 'kW',
+                'icon': 'mdi:chart-line',
+                'device_class': 'power',
+                'state_class': 'measurement',
+                'forecast_type': 'historical_pattern',
+                'confidence_level': 0.85,
+                'hourly_forecast': {
+                    '00:00': 1.2, '01:00': 1.1, '02:00': 1.0, '03:00': 1.0,
+                    '04:00': 1.1, '05:00': 1.3, '06:00': 1.8, '07:00': 2.5,
+                    '08:00': 2.8, '09:00': 2.2, '10:00': 1.9, '11:00': 1.7,
+                    '12:00': 1.8, '13:00': 1.6, '14:00': 1.5, '15:00': 1.4,
+                    '16:00': 1.6, '17:00': 2.1, '18:00': 3.2, '19:00': 3.8,
+                    '20:00': 3.5, '21:00': 3.1, '22:00': 2.4, '23:00': 1.9
+                },
+                'base_load': 1.2,
+                'peak_load': 3.8,
+                'load_variability': 0.65
+            }
+        ),
+        
+        'sensor.historical_load_pattern_01': MockHAEntity(
+            'sensor.historical_load_pattern_01',
+            '2.1',
+            {
+                'friendly_name': 'Historical Load Pattern',
+                'unit_of_measurement': 'kW',
+                'icon': 'mdi:chart-histogram',
+                'device_class': 'power',
+                'state_class': 'measurement',
+                'data_period': '30_days',
+                'weekday_average': 2.3,
+                'weekend_average': 2.8,
+                'holiday_average': 3.1,
+                'seasonal_factors': {
+                    'winter': 1.2,
+                    'spring': 0.9,
+                    'summer': 1.1,
+                    'autumn': 0.95
+                },
+                'time_patterns': {
+                    'morning_peak': {'time': '07:00-09:00', 'multiplier': 1.8},
+                    'evening_peak': {'time': '18:00-21:00', 'multiplier': 2.2},
+                    'night_valley': {'time': '02:00-05:00', 'multiplier': 0.6}
+                }
+            }
+        ),
+        
+        # Grid Stability and Demand Response
+        'sensor.grid_demand_response_signal_01': MockHAEntity(
+            'sensor.grid_demand_response_signal_01',
+            'normal',
+            {
+                'friendly_name': 'Grid Demand Response Signal',
+                'icon': 'mdi:transmission-tower',
+                'signal_type': 'normal',
+                'signal_level': 0,
+                'signal_strength': 'none',
+                'grid_stress': 'low',
+                'response_required': False,
+                'incentive_rate': 0.0,  # EUR/kWh for demand reduction
+                'signal_expiry': '2025-01-20T23:59:59+00:00',
+                'grid_operator': 'REN',
+                'emergency_level': False
+            }
+        ),
+        
+        'sensor.grid_carbon_intensity_01': MockHAEntity(
+            'sensor.grid_carbon_intensity_01',
+            '245',
+            {
+                'friendly_name': 'Grid Carbon Intensity',
+                'unit_of_measurement': 'gCO2/kWh',
+                'icon': 'mdi:molecule-co2',
+                'device_class': 'carbon_dioxide',
+                'state_class': 'measurement',
+                'min': 0,
+                'max': 800,
+                'forecast_24h': {
+                    '00:00': 280, '06:00': 320, '12:00': 180, '18:00': 250
+                },
+                'renewable_percentage': 65.2,
+                'fossil_percentage': 34.8,
+                    'nuclear_percentage': 0.0
+            }
+        ),
+        
+        # Energy Market and Trading
+        'sensor.energy_market_price_forecast_01': MockHAEntity(
+            'sensor.energy_market_price_forecast_01',
+            '68.31',
+            {
+                'friendly_name': 'Energy Market Price Forecast',
+                'unit_of_measurement': 'EUR/MWh',
+                'icon': 'mdi:chart-line',
+                'device_class': 'monetary',
+                'state_class': 'measurement',
+                'forecast_horizon': '24h',
+                'confidence_interval': 0.75,
+                'price_volatility': 'medium',
+                'market_trend': 'decreasing',
+                'peak_hours_forecast': {
+                    'morning': {'time': '07:00-09:00', 'price': 85.0},
+                    'evening': {'time': '18:00-21:00', 'price': 95.0}
+                },
+                'valley_hours_forecast': {
+                    'night': {'time': '02:00-05:00', 'price': 45.0},
+                    'midday': {'time': '12:00-15:00', 'price': 35.0}
+                }
+            }
+        ),
+        
+        # Battery Health and Aging
+        'sensor.battery_health_score_01': MockHAEntity(
+            'sensor.battery_health_score_01',
+            '92.5',
+            {
+                'friendly_name': 'Battery Health Score',
+                'unit_of_measurement': '%',
+                'icon': 'mdi:heart-pulse',
+                'device_class': 'battery',
+                'state_class': 'measurement',
+                'min': 0,
+                'max': 100,
+                'cycle_count': 1250,
+                'max_cycles': 5000,
+                'age_years': 2.3,
+                'warranty_years': 10,
+                'degradation_rate': 0.8,  # % per year
+                'efficiency_loss': 2.1,  # % from new
+                'temperature_stress': 'low',
+                'overcharge_events': 0,
+                'deep_discharge_events': 3
+            }
+        ),
+        
+        # Smart Home Automation Rules
+        'input_boolean.energy_saving_mode_01': MockHAEntity(
+            'input_boolean.energy_saving_mode_01',
+            'off',
+            {
+                'friendly_name': 'Energy Saving Mode',
+                'icon': 'mdi:leaf',
+                'editable': True,
+                'initial': False,
+                'restore': True,
+                'energy_savings_target': 15.0,  # % reduction target
+                'comfort_priority': 'medium',
+                'auto_enable_conditions': ['high_prices', 'grid_stress', 'low_solar']
+            }
+        ),
+        
+        'input_boolean.peak_shaving_mode_01': MockHAEntity(
+            'input_boolean.peak_shaving_mode_01',
+            'off',
+            {
+                'friendly_name': 'Peak Shaving Mode',
+                'icon': 'mdi:chart-line-variant',
+                'editable': True,
+                'initial': False,
+                'restore': True,
+                'peak_threshold': 4.0,  # kW
+                'shaving_duration': 2,  # hours
+                'battery_priority': 'high',
+                'load_shedding_order': ['dryer', 'dishwasher', 'ev_charger']
+            }
+        ),
+        
+        # Energy Efficiency Metrics
+        'sensor.home_energy_efficiency_score_01': MockHAEntity(
+            'sensor.home_energy_efficiency_score_01',
+            '78.5',
+            {
+                'friendly_name': 'Home Energy Efficiency Score',
+                'unit_of_measurement': '%',
+                'icon': 'mdi:lightbulb-on',
+                'device_class': 'efficiency',
+                'state_class': 'measurement',
+                'min': 0,
+                'max': 100,
+                'rating': 'B',
+                'improvement_potential': 21.5,
+                'benchmark_comparison': 'above_average',
+                'efficiency_factors': {
+                    'insulation': 85.0,
+                    'appliances': 72.0,
+                    'lighting': 90.0,
+                    'heating_cooling': 75.0,
+                    'renewables': 95.0
+                },
+                'recommendations': [
+                    'Upgrade HVAC system',
+                    'Add smart thermostats',
+                    'Improve insulation'
+                ]
+            }
+        ),
+        
+        # Grid Connection and Export Limits
+        'sensor.grid_export_limit_01': MockHAEntity(
+            'sensor.grid_export_limit_01',
+            '5.0',
+            {
+                'friendly_name': 'Grid Export Limit',
+                'unit_of_measurement': 'kW',
+                'icon': 'mdi:transmission-tower',
+                'device_class': 'power',
+                'state_class': 'measurement',
+                'contract_limit': 5.0,
+                'technical_limit': 7.5,
+                'current_export': 0.0,
+                'export_available': 5.0,
+                'grid_operator': 'REN',
+                'contract_type': 'net_metering',
+                'export_tariff': 0.08,  # EUR/kWh for exported energy
+                'export_restrictions': ['peak_hours', 'grid_maintenance']
+            }
+        ),
+        
+        # Weather Impact on Energy
+        'sensor.weather_energy_impact_01': MockHAEntity(
+            'sensor.weather_energy_impact_01',
+            'low',
+            {
+                'friendly_name': 'Weather Energy Impact',
+                'icon': 'mdi:weather-partly-cloudy',
+                'impact_level': 'low',
+                'impact_score': 0.2,  # 0-1 scale
+                'factors': {
+                    'temperature_deviation': 2.5,  # °C from seasonal average
+                    'solar_irradiance': 0.85,  # relative to clear sky
+                    'wind_speed': 12.0,  # km/h
+                    'humidity': 65,  # %
+                    'cloud_cover': 30  # %
+                },
+                'energy_implications': {
+                    'heating_adjustment': 0.0,  # kW
+                    'cooling_adjustment': 0.0,  # kW
+                    'solar_efficiency': 0.95,  # multiplier
+                    'load_variability': 0.1  # multiplier
+                },
+                'forecast_24h': {
+                    'temperature_trend': 'stable',
+                    'solar_conditions': 'partly_cloudy',
+                    'wind_conditions': 'moderate'
+                }
+            }
         )
     }
     
@@ -1115,7 +1777,7 @@ def demonstrate_pv_forecast_usage(entities: Dict[str, MockHAEntity]):
     
     print(f"Daily estimate: {extracted.get('daily_estimate', 0):.2f} kWh")
     print(f"Current hour forecast: {extracted.get('current_hour_forecast', 0):.2f} kW")
-    print(f"Data quality: {'✓ Correct' if extracted.get('data_correct') else '✗ Uncertain'}")
+    print(f"Data quality: {'Correct' if extracted.get('data_correct') else 'Uncertain'}")
     
     # Show hourly forecast for next few hours
     hourly_forecast = extracted.get('hourly_forecast', [])
@@ -1182,7 +1844,7 @@ def demonstrate_omie_pricing_usage(entities: Dict[str, MockHAEntity]):
     
     print(f"Today average price: {extracted.get('today_average', 0):.2f} EUR/MWh")
     print(f"Current hour price: {extracted.get('current_hour_price', 0):.2f} EUR/MWh")
-    print(f"Data quality: {'✓ Final' if not extracted.get('today_provisional') else '✗ Provisional'}")
+    print(f"Data quality: {'Final' if not extracted.get('today_provisional') else 'Provisional'}")
     
     # Show price analysis
     if 'peak_price' in extracted and 'off_peak_price' in extracted:
@@ -1209,17 +1871,17 @@ def demonstrate_omie_pricing_usage(entities: Dict[str, MockHAEntity]):
     off_peak_price = extracted.get('off_peak_price', 0.0)
     
     if current_price > off_peak_price * 1.5:  # If current price is 50% higher than off-peak
-        print(f"⚠️  High price alert: Current price ({current_price:.2f}) is {(current_price/off_peak_price - 1)*100:.1f}% higher than off-peak")
+        print(f"WARNING: High price alert: Current price ({current_price:.2f}) is {(current_price/off_peak_price - 1)*100:.1f}% higher than off-peak")
         print("   Recommendation: Shift non-critical loads to off-peak hours")
     else:
-        print(f"✅ Price is reasonable: Current price ({current_price:.2f}) is close to off-peak ({off_peak_price:.2f})")
+        print(f"OK: Price is reasonable: Current price ({current_price:.2f}) is close to off-peak ({off_peak_price:.2f})")
     
     # Example 2: Battery charging strategy
     if 'hourly_prices' in extracted:
         # Find the cheapest 4-hour window for battery charging
         sorted_prices = sorted(hourly_prices.items(), key=lambda x: x[1])
         cheapest_hours = sorted_prices[:4]
-        print(f"\n💡 Best battery charging window (4 hours):")
+        print(f"\nINFO: Best battery charging window (4 hours):")
         for hour, price in cheapest_hours:
             print(f"   {hour}: {price:.2f} EUR/MWh")
         
@@ -1235,7 +1897,7 @@ def demonstrate_omie_pricing_usage(entities: Dict[str, MockHAEntity]):
         # Find the most profitable hours for grid export
         sorted_prices = sorted(hourly_prices.items(), key=lambda x: x[1], reverse=True)
         best_export_hours = sorted_prices[:3]
-        print(f"\n💰 Best grid export hours:")
+        print(f"\nINFO: Best grid export hours:")
         for hour, price in best_export_hours:
             print(f"   {hour}: {price:.2f} EUR/MWh")
     
@@ -1263,11 +1925,11 @@ def main():
     demonstrate_omie_pricing_usage(entities)
     
     print("\n=== Test Summary ===")
-    print(f"✓ Tested {len(entities)} realistic entity types")
-    print(f"✓ Successfully extracted data from all entities")
-    print(f"✓ Simulated real-time data updates")
-    print(f"✓ Created comprehensive optimization data structure")
-    print(f"✓ Ready for Home Assistant integration")
+    print(f"OK: Tested {len(entities)} realistic entity types")
+    print(f"OK: Successfully extracted data from all entities")
+    print(f"OK: Simulated real-time data updates")
+    print(f"OK: Created comprehensive optimization data structure")
+    print(f"OK: Ready for Home Assistant integration")
     
     # Show some key insights
     print("\n=== Key Insights ===")
