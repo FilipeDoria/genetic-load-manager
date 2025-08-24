@@ -397,11 +397,13 @@ class GeneticLoadOptimizer:
                 if solution is not None:
                     for d in range(self.num_devices):
                         try:
-                            await self.hass.states.async_set(
-                                f"switch.device_{d}_schedule",
-                                "on" if solution[d][0] > 0.5 else "off",
-                                attributes={"schedule": solution[d]}
-                            )
+                            # Use proper Home Assistant state setting method
+                            entity_id = f"switch.device_{d}_schedule"
+                            state = "on" if solution[d][0] > 0.5 else "off"
+                            attributes = {"schedule": solution[d].tolist() if hasattr(solution[d], 'tolist') else list(solution[d])}
+                            
+                            # Set state using the proper Home Assistant method
+                            self.hass.states.async_set(entity_id, state, attributes)
                         except Exception as e:
                             _LOGGER.error(f"Error updating device {d} schedule: {e}")
                     _LOGGER.info("Periodic optimization completed successfully")

@@ -500,9 +500,13 @@ class ScheduleVisualizationSensor(SensorEntity):
                         "cost_impact": 0.1 * 1000 / 1000 if was_on else 0  # €0.10/kWh
                     })
                 
+                # Get current state properly from Home Assistant state object
+                state_obj = self.hass.states.get(f"switch.{device_name}_schedule")
+                current_state = state_obj.state if state_obj else "off"
+                
                 device_timelines[device_name] = {
                     "historical": timeline,
-                    "current_state": (self.hass.states.get(f"switch.{device_name}_schedule") or {}).get("state", "off"),
+                    "current_state": current_state,
                     "total_runtime_today": sum(1 for t in timeline if t["state"] == "on"),
                     "energy_consumed_today": sum(t["power_consumption"] for t in timeline) / 1000,  # kWh
                     "cost_today": sum(t["cost_impact"] for t in timeline)
