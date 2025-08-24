@@ -9,7 +9,7 @@ from .pricing_calculator import IndexedTariffCalculator
 
 _LOGGER = logging.getLogger(__name__)
 
-class GeneticAlgorithm:
+class GeneticLoadOptimizer:
     def __init__(self, hass: HomeAssistant, config: dict):
         self.hass = hass
         self.population_size = config.get("population_size", 100)
@@ -35,6 +35,10 @@ class GeneticAlgorithm:
         # Initialize pricing calculator
         self.pricing_calculator = IndexedTariffCalculator(hass, config)
         self.use_indexed_pricing = config.get("use_indexed_pricing", True)
+        
+        # Initialize optimization tracking
+        self.best_fitness = None
+        self.current_generation = 0
 
     async def fetch_forecast_data(self):
         """Fetch and process Solcast PV, load, battery, and pricing data for a 24-hour horizon."""
@@ -45,8 +49,23 @@ class GeneticAlgorithm:
         pv_forecast = np.zeros(self.time_slots)
 
         # Fetch today's and tomorrow's Solcast forecasts
-        pv_today_state = await self.hass.states.async_get(self.pv_forecast_entity)
-        pv_tomorrow_state = await self.hass.states.async_get(self.pv_forecast_tomorrow_entity)
+        pv_today_state = None
+        pv_tomorrow_state = None
+        
+        if self.pv_forecast_entity:
+            pv_today_state = self.hass.states.get(self.pv_forecast_entity)
+            if not pv_today_state:
+                _LOGGER.warning(f"PV forecast entity not found: {self.pv_forecast_entity}")
+        else:
+            _LOGGER.warning("No PV forecast entity configured")
+            
+        if self.pv_forecast_tomorrow_entity:
+            pv_tomorrow_state = self.hass.states.get(self.pv_forecast_tomorrow_entity)
+            if not pv_tomorrow_state:
+                _LOGGER.warning(f"PV tomorrow forecast entity not found: {self.pv_forecast_tomorrow_entity}")
+        else:
+            _LOGGER.warning("No PV tomorrow forecast entity configured")
+        
         pv_today_raw = pv_today_state.attributes.get("DetailedForecast", []) if pv_today_state else []
         pv_tomorrow_raw = pv_tomorrow_state.attributes.get("DetailedForecast", []) if pv_tomorrow_state else []
 
@@ -96,12 +115,44 @@ class GeneticAlgorithm:
                 return
 
         # Fetch load forecast
-        load_state = await self.hass.states.async_get(self.load_forecast_entity)
-        self.load_forecast = np.array([float(x) for x in load_state.attributes.get("forecast", [0.1] * self.time_slots)] if load_state else [0.1] * self.time_slots)
+        if self.load_forecast_entity:
+            load_state = self.hass.states.get(self.load_forecast_entity)
+            if load_state and load_state.state not in ['unknown', 'unavailable']:
+                try:
+                    forecast_data = load_state.attributes.get("forecast", [0.1] * self.time_slots)
+                    self.load_forecast = np.array([float(x) for x in forecast_data])
+                    if len(self.load_forecast) != self.time_slots:
+                        _LOGGER.warning(f"Load forecast size mismatch: got {len(self.load_forecast)}, expected {self.time_slots}")
+                        self.load_forecast = np.resize(self.load_forecast, self.time_slots)
+                except (ValueError, TypeError) as e:
+                    _LOGGER.error(f"Error parsing load forecast data: {e}")
+                    self.load_forecast = np.full(self.time_slots, 0.1)
+            else:
+                _LOGGER.warning(f"Load forecast entity unavailable: {self.load_forecast_entity}")
+                self.load_forecast = np.full(self.time_slots, 0.1)
+        else:
+            _LOGGER.warning("No load forecast entity configured")
+            self.load_forecast = np.full(self.time_slots, 0.1)
 
         # Fetch battery state and pricing
-        battery_state = await self.hass.states.async_get(self.battery_soc_entity)
-        self.battery_soc = float(battery_state.state) if battery_state else 0.0
+        if self.battery_soc_entity:
+            battery_state = self.hass.states.get(self.battery_soc_entity)
+            if battery_state and battery_state.state not in ['unknown', 'unavailable']:
+                try:
+                    self.battery_soc = float(battery_state.state)
+                    # Validate battery SOC is within reasonable range (0-100%)
+                    if not (0 <= self.battery_soc <= 100):
+                        _LOGGER.warning(f"Battery SOC out of range: {self.battery_soc}%, using 50%")
+                        self.battery_soc = 50.0
+                except (ValueError, TypeError) as e:
+                    _LOGGER.error(f"Error parsing battery SOC: {e}")
+                    self.battery_soc = 50.0  # Default to 50%
+            else:
+                _LOGGER.warning(f"Battery SOC entity unavailable: {self.battery_soc_entity}")
+                self.battery_soc = 50.0
+        else:
+            _LOGGER.warning("No battery SOC entity configured")
+            self.battery_soc = 50.0
         
         # Use indexed pricing calculator or fallback to simple pricing
         if self.use_indexed_pricing:
@@ -127,36 +178,66 @@ class GeneticAlgorithm:
                     self.population[i, d, :] = (self.population[i, d, :] > 0.5).astype(float)
 
     async def fitness_function(self, chromosome):
-        cost = 0.0
-        solar_utilization = 0.0
-        battery_penalty = 0.0
-        priority_penalty = 0.0
-        battery_soc = self.battery_soc
-        for t in range(self.time_slots):
-            total_load = np.sum(chromosome[:, t])
-            net_load = total_load - self.pv_forecast[t]
-            grid_energy = max(0, net_load)
-            cost += grid_energy * self.pricing[t]
-            solar_utilization += min(self.pv_forecast[t], total_load) / (self.pv_forecast[t] + 1e-6)
-            battery_change = 0
-            if net_load < 0:
-                battery_change = min(-net_load, self.max_charge_rate)
-            elif net_load > 0:
-                battery_change = -min(net_load, self.max_discharge_rate)
-            battery_soc += battery_change
-            if battery_soc < 0 or battery_soc > self.battery_capacity:
-                battery_penalty += abs(battery_soc - self.battery_capacity / 2) * 100
-            battery_soc = np.clip(battery_soc, 0, self.battery_capacity)
-            for d in range(self.num_devices):
-                priority_penalty += (1 - chromosome[d, t]) * self.device_priorities[d]
-        solar_efficiency = solar_utilization / self.time_slots
-        fitness = -(0.5 * cost + 0.3 * battery_penalty + 0.1 * priority_penalty - 0.1 * solar_efficiency)
-        return fitness
+        try:
+            # Validate inputs
+            if self.pv_forecast is None or self.pricing is None:
+                _LOGGER.warning("Missing forecast data in fitness function")
+                return -1000.0  # Heavy penalty for missing data
+            
+            if len(self.pv_forecast) != self.time_slots or len(self.pricing) != self.time_slots:
+                _LOGGER.warning(f"Forecast data size mismatch: PV={len(self.pv_forecast)}, Pricing={len(self.pricing)}, Expected={self.time_slots}")
+                return -1000.0
+            
+            cost = 0.0
+            solar_utilization = 0.0
+            battery_penalty = 0.0
+            priority_penalty = 0.0
+            battery_soc = self.battery_soc if hasattr(self, 'battery_soc') and self.battery_soc is not None else 0.0
+            
+            for t in range(self.time_slots):
+                total_load = np.sum(chromosome[:, t])
+                net_load = total_load - self.pv_forecast[t]
+                grid_energy = max(0, net_load)
+                cost += grid_energy * self.pricing[t]
+                solar_utilization += min(self.pv_forecast[t], total_load) / (self.pv_forecast[t] + 1e-6)
+                
+                # Battery management
+                battery_change = 0
+                if net_load < 0:
+                    battery_change = min(-net_load, self.max_charge_rate)
+                elif net_load > 0:
+                    battery_change = -min(net_load, self.max_discharge_rate)
+                battery_soc += battery_change
+                
+                # Battery constraint penalty
+                if battery_soc < 0 or battery_soc > self.battery_capacity:
+                    battery_penalty += abs(battery_soc - self.battery_capacity / 2) * 100
+                battery_soc = np.clip(battery_soc, 0, self.battery_capacity)
+                
+                # Device priority penalty
+                for d in range(self.num_devices):
+                    priority_penalty += (1 - chromosome[d, t]) * self.device_priorities[d]
+            
+            solar_efficiency = solar_utilization / self.time_slots
+            fitness = -(0.5 * cost + 0.3 * battery_penalty + 0.1 * priority_penalty - 0.1 * solar_efficiency)
+            
+            # Ensure finite result
+            if not np.isfinite(fitness):
+                _LOGGER.warning("Non-finite fitness value calculated")
+                return -1000.0
+                
+            return fitness
+            
+        except Exception as e:
+            _LOGGER.error(f"Error in fitness function: {e}")
+            return -1000.0  # Heavy penalty for errors
 
     async def tournament_selection(self, fitness_scores):
         tournament_size = 5
         selection = random.sample(range(self.population_size), tournament_size)
-        best_idx = selection[np.argmax([await self.fitness_function(self.population[i]) for i in selection])]
+        # Use pre-calculated fitness scores instead of recalculating
+        tournament_fitness = [fitness_scores[i] for i in selection]
+        best_idx = selection[np.argmax(tournament_fitness)]
         return self.population[best_idx]
 
     async def crossover(self, parent1, parent2):
@@ -182,6 +263,7 @@ class GeneticAlgorithm:
         best_solution = None
         best_fitness = float("-inf")
         for generation in range(self.generations):
+            self.current_generation = generation
             fitness_scores = np.array([await self.fitness_function(ind) for ind in self.population])
             new_population = []
             for _ in range(self.population_size // 2):
@@ -195,6 +277,7 @@ class GeneticAlgorithm:
             max_fitness = np.max(fitness_scores)
             if max_fitness > best_fitness:
                 best_fitness = max_fitness
+                self.best_fitness = best_fitness  # Update instance variable
                 best_solution = self.population[np.argmax(fitness_scores)].copy()
             await self.hass.states.async_set(
                 "sensor.genetic_algorithm_status",
@@ -205,14 +288,29 @@ class GeneticAlgorithm:
 
     async def schedule_optimization(self):
         async def periodic_optimization(now):
-            solution = await self.optimize()
-            for d in range(self.num_devices):
-                await self.hass.states.async_set(
-                    f"switch.device_{d}_schedule",
-                    "on" if solution[d][0] > 0.5 else "off",
-                    attributes={"schedule": solution[d].tolist()}
-                )
+            try:
+                _LOGGER.info("Starting periodic optimization")
+                solution = await self.optimize()
+                if solution is not None:
+                    for d in range(self.num_devices):
+                        try:
+                            await self.hass.states.async_set(
+                                f"switch.device_{d}_schedule",
+                                "on" if solution[d][0] > 0.5 else "off",
+                                attributes={"schedule": solution[d].tolist()}
+                            )
+                        except Exception as e:
+                            _LOGGER.error(f"Error updating device {d} schedule: {e}")
+                    _LOGGER.info("Periodic optimization completed successfully")
+                else:
+                    _LOGGER.warning("Optimization returned no solution")
+            except Exception as e:
+                _LOGGER.error(f"Error in periodic optimization: {e}")
+        
+        # Run initial optimization
         await periodic_optimization(datetime.now())
+        
+        # Schedule periodic optimizations
         async_remove_tracker = async_track_time_interval(self.hass, periodic_optimization, timedelta(minutes=15))
         self.hass.data[DOMAIN]["async_remove_tracker"] = async_remove_tracker
         return async_remove_tracker
