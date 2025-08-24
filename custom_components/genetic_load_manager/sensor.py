@@ -89,7 +89,7 @@ class LoadForecastSensor(SensorEntity):
             self._async_unsub_track_time()
             self._async_unsub_track_time = None
 
-    async def async_update(self):
+    async def async_update(self, now=None):
         """Update the sensor with a new 24-hour load forecast based on last 24 hours of data."""
         if not self.load_sensor_entity:
             if not self._warning_shown:
@@ -256,7 +256,7 @@ class IndexedPricingSensor(SensorEntity):
         async_track_time_interval(self.hass, self.async_update, timedelta(minutes=5))
         await self.async_update()
 
-    async def async_update(self):
+    async def async_update(self, now=None):
         """Update the sensor with current pricing information."""
         try:
             # Get current price
@@ -307,7 +307,7 @@ class GeneticAlgorithmStatusSensor(SensorEntity):
         """Set up the sensor."""
         await self.async_update()
 
-    async def async_update(self):
+    async def async_update(self, now=None):
         """Update the sensor status."""
         try:
             # Get genetic algorithm instance from hass data

@@ -121,7 +121,7 @@ class GeneticLoadSwitch(SwitchEntity):
             _LOGGER.error(error_msg)
             raise
     
-    async def async_update(self) -> None:
+    async def async_update(self, now=None) -> None:
         """Update the switch state."""
         try:
             # Get current state from the actual load
