@@ -1,9 +1,9 @@
-# Advanced Genetic Load Manager Dashboard
-# Modern, responsive UI with charts and interactive elements
-# Requires: mini-graph-card, button-card, apexcharts-card (HACS custom cards)
+# Simple Genetic Load Manager Dashboard
+# Basic, working dashboard without complex chart configurations
+# Copy this to your Lovelace dashboards
 
-title: "🧬 Genetic Load Manager"
-path: genetic-load-manager
+title: "🧬 Genetic Load Manager - Simple"
+path: genetic-load-manager-simple
 icon: mdi:dna
 panel: false
 cards:
@@ -107,7 +107,7 @@ cards:
 # MAIN DASHBOARD GRID
 # ==================================================
 - type: grid
-  columns: 3
+  columns: 2
   square: false
   cards:
     
@@ -151,49 +151,6 @@ cards:
               attribute: quick_stats.active_optimizations
               name: "Active Optimizations"
               icon: mdi:cog-play
-
-    # COST ANALYSIS CARD
-    - type: vertical-stack
-      cards:
-        - type: custom:button-card
-          name: "💰 Cost Analysis"
-          styles:
-            card:
-              - background: none
-              - border: none
-              - box-shadow: none
-            name:
-              - font-size: 18px
-              - font-weight: bold
-              - color: var(--primary-text-color)
-        
-        - type: custom:apexcharts-card
-          header:
-            show: false
-          chart_type: line
-          series:
-            - entity: sensor.cost_analytics
-              attribute: chart_data.daily_savings_trend.datasets.0.data
-              name: "Daily Savings"
-              color: "#4CAF50"
-              stroke_width: 3
-          graph_span: 14d
-          span:
-            end: day
-        
-        - type: horizontal-stack
-          cards:
-            - type: entity
-              entity: sensor.cost_analytics
-              attribute: financial_summary.monthly_projection
-              name: "Monthly"
-              icon: mdi:calendar-month
-            
-            - type: entity
-              entity: sensor.cost_analytics
-              attribute: financial_summary.annual_projection
-              name: "Annual"
-              icon: mdi:calendar-range
 
     # DEVICE CONTROL CARD
     - type: vertical-stack
@@ -293,137 +250,81 @@ cards:
                   - font-weight: bold
 
 # ==================================================
-# DETAILED ANALYTICS ROW
+# SIMPLE CHARTS (USING MINI-GRAPH-CARD)
 # ==================================================
 - type: horizontal-stack
   cards:
     
-    # HOURLY PRICING CHART
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: "⚡ 24-Hour Pricing"
-      chart_type: column
-      series:
-        - entity: sensor.genetic_load_manager_indexed_pricing
-          attribute: 24h_forecast
-          name: "Price (€/kWh)"
-          color: "#FF9800"
-      xaxis:
-        categories:
-          - "00:00"
-          - "01:00"
-          - "02:00"
-          - "03:00"
-          - "04:00"
-          - "05:00"
-          - "06:00"
-          - "07:00"
-          - "08:00"
-          - "09:00"
-          - "10:00"
-          - "11:00"
-          - "12:00"
-          - "13:00"
-          - "14:00"
-          - "15:00"
-          - "16:00"
-          - "17:00"
-          - "18:00"
-          - "19:00"
-          - "20:00"
-          - "21:00"
-          - "22:00"
-          - "23:00"
+    # PRICING TREND
+    - type: custom:mini-graph-card
+      name: "⚡ 24-Hour Pricing Trend"
+      entity: sensor.genetic_load_manager_indexed_pricing
+      line_color: "#FF9800"
+      line_width: 3
+      hours_to_show: 24
+      points_per_hour: 4
+      animate: true
+      show:
+        labels: true
+        legend: false
+        state: true
 
-    # EFFICIENCY RADAR CHART
-    - type: custom:apexcharts-card
-      header:
-        show: true
-        title: "📊 System Efficiency"
-      chart_type: radialBar
-      series:
-        - entity: sensor.cost_analytics
-          attribute: efficiency_metrics.overall_system_efficiency
-          name: "Overall"
-          color: "#2196F3"
-        
-        - entity: sensor.cost_analytics
-          attribute: efficiency_metrics.solar_utilization_percent
-          name: "Solar"
-          color: "#FF9800"
-        
-        - entity: sensor.cost_analytics
-          attribute: efficiency_metrics.load_optimization_percent
-          name: "Load"
-          color: "#4CAF50"
-
-    # DEVICE PERFORMANCE
-    - type: vertical-stack
-      cards:
-        - type: custom:button-card
-          name: "📈 Device Performance"
-          styles:
-            card:
-              - background: none
-              - border: none
-              - box-shadow: none
-            name:
-              - font-size: 16px
-              - font-weight: bold
-        
-        - type: custom:apexcharts-card
-          chart_type: donut
-          series:
-            - entity: sensor.cost_analytics
-              attribute: device_costs.device_0.cost_today
-              name: "Device 0"
-              color: "#FF6B6B"
-            
-            - entity: sensor.cost_analytics
-              attribute: device_costs.device_1.cost_today
-              name: "Device 1"
-              color: "#4ECDC4"
+    # COST SAVINGS TREND
+    - type: custom:mini-graph-card
+      name: "💰 Cost Savings Trend"
+      entity: sensor.cost_analytics
+      line_color: "#4CAF50"
+      line_width: 3
+      hours_to_show: 24
+      points_per_hour: 4
+      animate: true
+      show:
+        labels: true
+        legend: false
+        state: true
 
 # ==================================================
-# SCHEDULE TIMELINE
+# SYSTEM INFORMATION PANEL
 # ==================================================
-- type: custom:apexcharts-card
-  header:
-    show: true
-    title: "📅 24-Hour Schedule Timeline"
-  chart_type: line
-  stacked: true
-  series:
-    - entity: sensor.schedule_visualization
-      attribute: schedule_data.predicted_schedule
-      data_generator: |
-        return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
-          x: slot.time,
-          y: slot.devices.device_0 * 1000
-        }));
-      name: "Device 0 (W)"
-      color: "#FF6B6B"
+- type: entities
+  title: "ℹ️ System Information"
+  show_header_toggle: false
+  entities:
+    - entity: binary_sensor.genetic_load_manager_optimization_running
+      name: "Optimization Running"
+      icon: mdi:play-circle
     
-    - entity: sensor.schedule_visualization
-      attribute: schedule_data.predicted_schedule
-      data_generator: |
-        return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
-          x: slot.time,
-          y: slot.devices.device_1 * 1000
-        }));
-      name: "Device 1 (W)"
-      color: "#4ECDC4"
+    - entity: binary_sensor.genetic_load_manager_system_healthy
+      name: "System Healthy"
+      icon: mdi:heart-pulse
     
-    - entity: sensor.schedule_visualization
-      attribute: schedule_data.predicted_schedule
-      data_generator: |
-        return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
-          x: slot.time,
-          y: slot.solar_forecast * 1000
-        }));
-      name: "Solar (W)"
-      color: "#FFE66D"
+    - entity: binary_sensor.genetic_load_manager_loads_controlled
+      name: "Loads Controlled"
+      icon: mdi:lightning-bolt
+    
+    - entity: binary_sensor.genetic_load_manager_algorithm_error
+      name: "Algorithm Errors"
+      icon: mdi:alert-circle
+    
+    - type: divider
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.solar_production_today
+      name: "Solar Production Today"
+      icon: mdi:solar-power
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.grid_import_today
+      name: "Grid Import Today"
+      icon: mdi:transmission-tower
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.battery_cycles_today
+      name: "Battery Cycles Today"
+      icon: mdi:battery-charging
 
 # ==================================================
 # CONTROL PANEL
@@ -518,99 +419,7 @@ cards:
               - font-size: 14px
 
 # ==================================================
-# SYSTEM INFORMATION PANEL
-# ==================================================
-- type: entities
-  title: "ℹ️ System Information"
-  show_header_toggle: false
-  entities:
-    - entity: binary_sensor.genetic_load_manager_optimization_running
-      name: "Optimization Running"
-      icon: mdi:play-circle
-    
-    - entity: binary_sensor.genetic_load_manager_system_healthy
-      name: "System Healthy"
-      icon: mdi:heart-pulse
-    
-    - entity: binary_sensor.genetic_load_manager_loads_controlled
-      name: "Loads Controlled"
-      icon: mdi:lightning-bolt
-    
-    - entity: binary_sensor.genetic_load_manager_algorithm_error
-      name: "Algorithm Errors"
-      icon: mdi:alert-circle
-    
-    - type: divider
-    
-    - type: attribute
-      entity: sensor.genetic_load_manager_dashboard
-      attribute: quick_stats.solar_production_today
-      name: "Solar Production Today"
-      icon: mdi:solar-power
-    
-    - type: attribute
-      entity: sensor.genetic_load_manager_dashboard
-      attribute: quick_stats.grid_import_today
-      name: "Grid Import Today"
-      icon: mdi:transmission-tower
-    
-    - type: attribute
-      entity: sensor.genetic_load_manager_dashboard
-      attribute: quick_stats.battery_cycles_today
-      name: "Battery Cycles Today"
-      icon: mdi:battery-charging
-
-# ==================================================
-# EMERGENCY CONTROLS (CONDITIONAL)
-# ==================================================
-- type: conditional
-  conditions:
-    - entity: binary_sensor.genetic_load_manager_algorithm_error
-      state: "on"
-  card:
-    type: vertical-stack
-    cards:
-      - type: markdown
-        content: |
-          ## ⚠️ System Alert
-          There are issues with the genetic algorithm. Emergency controls are available below.
-      
-      - type: horizontal-stack
-        cards:
-          - type: custom:button-card
-            name: "🛑 Emergency Stop"
-            icon: mdi:emergency-stop
-            tap_action:
-              action: call-service
-              service: genetic_load_manager.stop_optimization
-            styles:
-              card:
-                - background: linear-gradient(135deg, #F44336, #E57373)
-                - color: white
-                - border-radius: 10px
-                - height: 60px
-              name:
-                - font-weight: bold
-          
-          - type: custom:button-card
-            name: "🔄 Reset System"
-            icon: mdi:restart
-            tap_action:
-              action: call-service
-              service: homeassistant.reload_config_entry
-              target:
-                entity_id: sensor.genetic_load_manager_dashboard
-            styles:
-              card:
-                - background: linear-gradient(135deg, #FF9800, #FFB74D)
-                - color: white
-                - border-radius: 10px
-                - height: 60px
-              name:
-                - font-weight: bold
-
-# ==================================================
-# MOBILE COMPACT VIEW (CONDITIONAL)
+# MOBILE COMPACT VIEW
 # ==================================================
 - type: conditional
   conditions:
