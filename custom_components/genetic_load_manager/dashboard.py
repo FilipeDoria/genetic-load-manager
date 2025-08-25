@@ -434,82 +434,98 @@ class ScheduleVisualizationSensor(SensorEntity):
             _LOGGER.error(f"Error updating current schedule: {e}")
 
     async def _update_predicted_schedule(self, genetic_algo):
-        """Update predicted schedule for next 24 hours."""
+        """Update predicted schedule for next 24 hours with efficient data storage."""
         try:
-            predicted_schedule = []
+            # Instead of storing 96 detailed slots, store hourly summaries
+            hourly_summary = []
             
-            # Generate 24-hour prediction (96 x 15-minute slots)
-            for slot in range(96):
-                time_offset = timedelta(minutes=slot * 15)
-                slot_time = datetime.now() + time_offset
+            # Generate 24-hour prediction (hourly summaries instead of 15-minute slots)
+            for hour in range(24):
+                hour_start = datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
                 
-                # Get pricing for this slot
+                # Get pricing for this hour
                 pricing_sensor = self.hass.states.get(f"sensor.{DOMAIN}_indexed_pricing")
                 if pricing_sensor and 'forecast' in pricing_sensor.attributes:
                     forecast = pricing_sensor.attributes.get('24h_forecast', [])
-                    price = forecast[slot // 4] if (slot // 4) < len(forecast) else 0.1
+                    price = forecast[hour] if hour < len(forecast) else 0.1
                 else:
                     price = 0.1
                 
-                # Simulate device predictions
+                # Calculate device predictions for this hour (simplified)
                 device_predictions = {}
+                total_load = 0
                 for device_id in range(getattr(genetic_algo, 'num_devices', 2)):
                     # Simple prediction logic (in real implementation, use GA results)
                     if price < 0.12:
-                        device_predictions[f"device_{device_id}"] = 1.0
+                        device_value = 1.0
                     elif price < 0.15:
-                        device_predictions[f"device_{device_id}"] = 0.5
+                        device_value = 0.5
                     else:
-                        device_predictions[f"device_{device_id}"] = 0.0
+                        device_value = 0.0
+                    
+                    device_predictions[f"d{device_id}"] = device_value  # Shortened key
+                    total_load += device_value
                 
-                predicted_schedule.append({
-                    "slot": slot,
-                    "time": slot_time.strftime("%H:%M"),
-                    "price": price,
-                    "devices": device_predictions,
-                    "total_load": sum(device_predictions.values()),
-                    "solar_forecast": max(0, math.sin(slot * math.pi / 48) * 2)  # Simplified solar curve
+                # Simplified solar forecast (peak at noon)
+                solar_forecast = max(0, math.sin((hour - 6) * math.pi / 12) * 2) if 6 <= hour <= 18 else 0
+                
+                hourly_summary.append({
+                    "h": hour,  # Shortened key
+                    "p": round(price, 3),  # Shortened key, reduced precision
+                    "d": device_predictions,  # Shortened key
+                    "l": round(total_load, 2),  # Shortened key
+                    "s": round(solar_forecast, 2)  # Shortened key
                 })
             
-            self._schedule_data["predicted_schedule"] = predicted_schedule
+            self._schedule_data["predicted_schedule"] = hourly_summary
             
         except Exception as e:
             _LOGGER.error(f"Error updating predicted schedule: {e}")
 
     async def _update_device_timelines(self, genetic_algo):
-        """Update individual device timelines."""
+        """Update individual device timelines with efficient data storage."""
         try:
             device_timelines = {}
             
             for device_id in range(getattr(genetic_algo, 'num_devices', 2)):
-                device_name = f"device_{device_id}"
+                device_name = f"d{device_id}"  # Shortened key
                 
-                # Get historical data (last 24 hours)
-                timeline = []
+                # Get current state properly from Home Assistant state object
+                state_obj = self.hass.states.get(f"switch.device_{device_id}_schedule")
+                current_state = state_obj.state if state_obj else "off"
+                
+                # Simplified timeline with hourly data instead of detailed historical
+                hourly_usage = []
+                total_runtime = 0
+                total_energy = 0
+                total_cost = 0
+                
                 for hour in range(24):
                     time_point = datetime.now() - timedelta(hours=23-hour)
                     
-                    # Simulate historical data
-                    was_on = random.choice([True, False])  # Simplified random choice
+                    # Simulate historical data (simplified)
+                    was_on = random.choice([True, False])
+                    runtime = 1 if was_on else 0
+                    energy = 1.0 if was_on else 0.0  # kWh
+                    cost = 0.1 * energy  # €0.10/kWh
                     
-                    timeline.append({
-                        "time": time_point.strftime("%H:%M"),
-                        "timestamp": time_point.isoformat(),
-                        "state": "on" if was_on else "off",
-                        "power_consumption": 1000 if was_on else 0,  # 1kW when on
-                        "cost_impact": 0.1 * 1000 / 1000 if was_on else 0  # €0.10/kWh
+                    hourly_usage.append({
+                        "h": hour,  # Shortened key
+                        "r": runtime,  # Shortened key
+                        "e": energy,  # Shortened key
+                        "c": round(cost, 3)  # Shortened key, reduced precision
                     })
-                
-                # Get current state properly from Home Assistant state object
-                state_obj = self.hass.states.get(f"switch.{device_name}_schedule")
-                current_state = state_obj.state if state_obj else "off"
+                    
+                    total_runtime += runtime
+                    total_energy += energy
+                    total_cost += cost
                 
                 device_timelines[device_name] = {
-                    "historical": timeline,
-                    "current_state": current_state,
-                    "total_runtime_today": sum(1 for t in timeline if t["state"] == "on"),
-                    "energy_consumed_today": sum(t["power_consumption"] for t in timeline) / 1000,  # kWh
-                    "cost_today": sum(t["cost_impact"] for t in timeline)
+                    "h": hourly_usage,  # Shortened key
+                    "c": current_state,  # Shortened key
+                    "r": total_runtime,  # Shortened key
+                    "e": round(total_energy, 2),  # Shortened key
+                    "t": round(total_cost, 3)  # Shortened key
                 }
             
             self._schedule_data["device_timelines"] = device_timelines
@@ -549,12 +565,13 @@ class ScheduleVisualizationSensor(SensorEntity):
             "colors": {
                 "device_0": "#FF6B6B",
                 "device_1": "#4ECDC4",
-                "solar": "#FFE66D",
-                "grid": "#95E1D3",
-                "cost": "#F38BA8"
+                "device_2": "#45B7D1",
+                "device_3": "#96CEB4",
+                "solar": "#FFEAA7",
+                "grid": "#DDA0DD"
             },
-            "time_range": "24h",
-            "update_interval": "5min"
+            "data_format": "compressed",  # Indicate data is compressed
+            "update_interval": "5 minutes"
         }
 
 

@@ -327,6 +327,44 @@ async def async_register_services(hass: HomeAssistant):
         except Exception as e:
             _LOGGER.error(f"Error getting schedule statistics: {e}")
 
+    async def handle_get_expanded_schedule(call):
+        """Handle getting expanded schedule data."""
+        try:
+            target = call.data.get("target", {})
+            
+            # Get the target entity
+            entity_id = target.get("entity", {}).get("entity_id")
+            if not entity_id:
+                _LOGGER.error("No entity specified in target")
+                return
+            
+            # Get the entity state
+            entity_state = hass.states.get(entity_id)
+            if not entity_state:
+                _LOGGER.error(f"Entity {entity_id} not found")
+                return
+            
+            # Check if this is a schedule visualization sensor
+            if "schedule_visualization" in entity_id:
+                # Get the sensor instance to access expansion method
+                for platform in hass.data[DOMAIN].get("platforms", []):
+                    if hasattr(platform, "entities"):
+                        for entity in platform.entities:
+                            if entity.entity_id == entity_id and hasattr(entity, "_expand_compressed_schedule"):
+                                expanded_data = entity._expand_compressed_schedule()
+                                _LOGGER.info(f"Expanded schedule data for {entity_id}: {len(str(expanded_data))} characters")
+                                return
+            
+            # Fallback: try to get from attributes
+            schedule_data = entity_state.attributes.get("schedule_data") or entity_state.attributes.get("compressed_schedule")
+            if schedule_data:
+                _LOGGER.info(f"Schedule data for {entity_id}: {len(str(schedule_data))} characters")
+            else:
+                _LOGGER.warning(f"No schedule data available for {entity_id}")
+            
+        except Exception as e:
+            _LOGGER.error(f"Error getting expanded schedule: {e}")
+
     def calculate_schedule_statistics(schedule_data):
         """Calculate statistics from schedule data."""
         try:
@@ -394,4 +432,7 @@ async def async_register_services(hass: HomeAssistant):
     )
     hass.services.async_register(
         DOMAIN, "get_schedule_statistics", handle_get_schedule_statistics
+    )
+    hass.services.async_register(
+        DOMAIN, "get_expanded_schedule", handle_get_expanded_schedule
     )

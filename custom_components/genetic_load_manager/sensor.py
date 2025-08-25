@@ -409,33 +409,49 @@ class ScheduleVisualizationSensor(SensorEntity):
                     "optimization_status": "No data"
                 }
             
-            # Count active time slots per device
+            # Count active time slots per device (handle compressed format)
             device_summary = []
-            for i, device_schedule in enumerate(schedule):
-                if isinstance(device_schedule, dict) and "devices" in device_schedule:
-                    # Count active slots (non-zero values)
-                    active_slots = sum(1 for val in device_schedule["devices"].values() if val > 0.1)
+            total_active_slots = 0
+            
+            if schedule and isinstance(schedule[0], dict) and "d" in schedule[0]:
+                # Compressed format with shortened keys
+                num_devices = len(schedule[0]["d"]) if schedule else 0
+                for device_id in range(num_devices):
+                    device_key = f"d{device_id}"
+                    active_slots = sum(1 for slot in schedule if slot.get("d", {}).get(device_key, 0) > 0.1)
+                    total_active_slots += active_slots
                     device_summary.append({
-                        "device_id": i,
+                        "device_id": device_id,
                         "active_slots": active_slots,
-                        "total_slots": len(device_schedule["devices"])
+                        "total_slots": len(schedule)
                     })
-                elif isinstance(device_schedule, list):
-                    # Handle list format
-                    active_slots = sum(1 for val in device_schedule if val > 0.1)
-                    device_summary.append({
-                        "device_id": i,
-                        "active_slots": active_slots,
-                        "total_slots": len(device_schedule)
-                    })
+            else:
+                # Legacy format
+                for i, device_schedule in enumerate(schedule):
+                    if isinstance(device_schedule, dict) and "devices" in device_schedule:
+                        active_slots = sum(1 for val in device_schedule["devices"].values() if val > 0.1)
+                        device_summary.append({
+                            "device_id": i,
+                            "active_slots": active_slots,
+                            "total_slots": len(device_schedule["devices"])
+                        })
+                    elif isinstance(device_schedule, list):
+                        active_slots = sum(1 for val in device_schedule if val > 0.1)
+                        device_summary.append({
+                            "device_id": i,
+                            "active_slots": active_slots,
+                            "total_slots": len(device_schedule)
+                        })
             
             return {
                 "status": "Schedule available",
                 "last_updated": self._schedule_data.get("last_updated", "Unknown"),
                 "total_devices": len(device_summary),
                 "device_summary": device_summary,
+                "total_active_slots": total_active_slots,
                 "optimization_status": self._schedule_data.get("optimization_status", "Unknown"),
-                "cost_estimate": self._schedule_data.get("cost_estimate", 0)
+                "cost_estimate": self._schedule_data.get("cost_estimate", 0),
+                "data_format": "compressed" if schedule and isinstance(schedule[0], dict) and "h" in schedule[0] else "legacy"
             }
         except Exception as e:
             _LOGGER.error(f"Error creating schedule summary: {e}")
@@ -444,6 +460,46 @@ class ScheduleVisualizationSensor(SensorEntity):
                 "error": str(e),
                 "last_updated": "Unknown"
             }
+
+    def _expand_compressed_schedule(self):
+        """Expand compressed schedule data to full format for external use."""
+        if not hasattr(self, '_schedule_data') or not self._schedule_data:
+            return {}
+        
+        try:
+            schedule = self._schedule_data.get("predicted_schedule", [])
+            if not schedule or not isinstance(schedule[0], dict) or "h" not in schedule[0]:
+                return self._schedule_data  # Return as-is if not compressed
+            
+            # Expand compressed data
+            expanded = {}
+            expanded_schedule = []
+            
+            for slot in schedule:
+                hour = slot.get("h", 0)
+                time_str = f"{hour:02d}:00"
+                
+                expanded_slot = {
+                    "slot": hour,
+                    "time": time_str,
+                    "price": slot.get("p", 0.1),
+                    "devices": {f"device_{k[1:]}": v for k, v in slot.get("d", {}).items()},
+                    "total_load": slot.get("l", 0),
+                    "solar_forecast": slot.get("s", 0)
+                }
+                expanded_schedule.append(expanded_slot)
+            
+            expanded["predicted_schedule"] = expanded_schedule
+            expanded["last_updated"] = self._schedule_data.get("last_updated", "Unknown")
+            expanded["optimization_status"] = self._schedule_data.get("optimization_status", "Unknown")
+            expanded["cost_estimate"] = self._schedule_data.get("cost_estimate", 0)
+            expanded["data_format"] = "expanded"
+            
+            return expanded
+            
+        except Exception as e:
+            _LOGGER.error(f"Error expanding compressed schedule: {e}")
+            return {"error": f"Expansion failed: {str(e)}"}
 
     @property
     def extra_state_attributes(self):
@@ -456,58 +512,22 @@ class ScheduleVisualizationSensor(SensorEntity):
             "summary": self._get_schedule_summary()
         }
         
-        # Only include detailed data if it's small enough
+        # Check data size and include appropriate level of detail
         try:
             # Convert schedule data to string to check size
             schedule_str = str(self._schedule_data)
             if len(schedule_str) < 8000:  # Conservative limit well under 16KB
-                attributes["detailed_schedule"] = self._schedule_data
-                _LOGGER.debug("Including detailed schedule data in attributes")
+                attributes["schedule_data"] = self._schedule_data
+                _LOGGER.debug("Including full schedule data in attributes")
             else:
-                # Data is too large, provide compressed version
-                compressed_data = self._get_compressed_schedule()
-                compressed_str = str(compressed_data)
-                if len(compressed_str) < 8000:
-                    attributes["compressed_schedule"] = compressed_data
-                    _LOGGER.debug("Including compressed schedule data in attributes")
-                else:
-                    _LOGGER.warning("Schedule data too large even when compressed, only summary available")
-                    attributes["note"] = "Detailed data too large for attributes. Use services to access full data."
+                # Data is too large, provide compressed version and expansion method
+                _LOGGER.warning("Schedule data too large for attributes, providing compressed version")
+                attributes["compressed_schedule"] = self._schedule_data
+                attributes["note"] = "Data is compressed. Use services to access expanded format."
+                attributes["expansion_available"] = True
+                
         except Exception as e:
             _LOGGER.error(f"Error processing schedule attributes: {e}")
             attributes["error"] = f"Failed to process schedule data: {str(e)}"
         
         return attributes
-
-    def _get_compressed_schedule(self):
-        """Get a compressed version of the schedule data."""
-        if not hasattr(self, '_schedule_data') or not self._schedule_data:
-            return {}
-        
-        try:
-            compressed = {}
-            schedule = self._schedule_data.get("predicted_schedule", [])
-            
-            # Compress device schedules
-            compressed_devices = []
-            for i, device_schedule in enumerate(schedule):
-                if isinstance(device_schedule, dict) and "devices" in device_schedule:
-                    # Convert to list and round values to reduce precision
-                    device_data = list(device_schedule["devices"].values())
-                    compressed_device = [round(val, 2) for val in device_data]
-                    compressed_devices.append(compressed_device)
-                elif isinstance(device_schedule, list):
-                    # Round values to reduce precision
-                    compressed_device = [round(val, 2) for val in device_schedule]
-                    compressed_devices.append(compressed_device)
-            
-            compressed["predicted_schedule"] = compressed_devices
-            compressed["last_updated"] = self._schedule_data.get("last_updated", "Unknown")
-            compressed["optimization_status"] = self._schedule_data.get("optimization_status", "Unknown")
-            compressed["cost_estimate"] = round(self._schedule_data.get("cost_estimate", 0), 2)
-            
-            return compressed
-            
-        except Exception as e:
-            _LOGGER.error(f"Error compressing schedule data: {e}")
-            return {"error": f"Compression failed: {str(e)}"}

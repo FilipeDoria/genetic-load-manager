@@ -304,7 +304,7 @@ test_optimization:
           max: 24
           step: 1
           default: 24
-          unit_of_measurement: hours 
+          unit_of_measurement: hours
 
 genetic_load_manager:
   get_full_schedule:
@@ -353,4 +353,16 @@ genetic_load_manager:
             entity:
               domain: sensor
               device_class: energy
-        required: true 
+        required: true
+
+get_expanded_schedule:
+  name: Get Expanded Schedule
+  description: Get the full expanded schedule data for external use
+  fields:
+    target:
+      name: Target
+      description: The entity to get schedule data from
+      selector:
+        entity:
+          domain: sensor
+          integration: genetic_load_manager

@@ -141,6 +141,7 @@ class GeneticLoadOptimizer:
             if pv_today_raw:
                 _LOGGER.debug(f"First item structure: {pv_today_raw[0]}")
                 _LOGGER.debug(f"First item keys: {list(pv_today_raw[0].keys()) if isinstance(pv_today_raw[0], dict) else 'Not a dict'}")
+                _LOGGER.debug(f"Sample data points: {pv_today_raw[:3]}")
                 
         if pv_tomorrow_state:
             pv_tomorrow_raw = pv_tomorrow_state.attributes.get("DetailedForecast", [])
@@ -153,6 +154,7 @@ class GeneticLoadOptimizer:
             if pv_tomorrow_raw:
                 _LOGGER.debug(f"First item structure: {pv_tomorrow_raw[0]}")
                 _LOGGER.debug(f"First item keys: {list(pv_tomorrow_raw[0].keys()) if isinstance(pv_tomorrow_raw[0], dict) else 'Not a dict'}")
+                _LOGGER.debug(f"Sample data points: {pv_tomorrow_raw[:3]}")
 
         if not pv_today_raw and not pv_tomorrow_raw:
             _LOGGER.warning("No Solcast PV forecast data available, using zeros")
@@ -161,6 +163,8 @@ class GeneticLoadOptimizer:
             # Combine forecasts
             times = []
             values = []
+            
+            _LOGGER.info(f"Processing PV forecasts - Today: {len(pv_today_raw)} items, Tomorrow: {len(pv_tomorrow_raw)} items")
             
             for forecast_name, forecast in [("today", pv_today_raw), ("tomorrow", pv_tomorrow_raw)]:
                 if not forecast:
@@ -194,13 +198,18 @@ class GeneticLoadOptimizer:
                                     current_time = current_time.replace(tzinfo=period_time.tzinfo)
                                     _LOGGER.debug(f"Made current_time timezone-aware: {current_time}")
                                 
-                                # Only include future times
-                                if period_time >= current_time:
+                                # For PV forecasts, include all data for the next 48 hours regardless of current time
+                                # This ensures we get both today and tomorrow's data even if it's currently night
+                                time_diff = period_time - current_time
+                                hours_ahead = time_diff.total_seconds() / 3600
+                                
+                                # Include data up to 48 hours in the future
+                                if hours_ahead >= -2 and hours_ahead <= 48:  # Allow 2 hours in the past for safety
                                     times.append(period_time)
                                     values.append(pv_value)
-                                    _LOGGER.debug(f"Added forecast: {period_time} -> {pv_value} kW")
+                                    _LOGGER.debug(f"Added forecast: {period_time} -> {pv_value} kW (hours ahead: {hours_ahead:.1f})")
                                 else:
-                                    _LOGGER.debug(f"Skipping past time: {period_time} (current: {current_time})")
+                                    _LOGGER.debug(f"Skipping time: {period_time} (hours ahead: {hours_ahead:.1f})")
                                     
                             except ValueError as e:
                                 _LOGGER.debug(f"Could not parse time '{period_start}': {e}")
@@ -217,12 +226,16 @@ class GeneticLoadOptimizer:
                                     else:
                                         current_time_naive = current_time
                                     
-                                    if period_time >= current_time_naive:
+                                    time_diff = period_time - current_time_naive
+                                    hours_ahead = time_diff.total_seconds() / 3600
+                                    
+                                    # Include data up to 48 hours in the future
+                                    if hours_ahead >= -2 and hours_ahead <= 48:
                                         times.append(period_time)
                                         values.append(pv_value)
-                                        _LOGGER.debug(f"Added forecast (clean time): {period_time} -> {pv_value} kW")
+                                        _LOGGER.debug(f"Added forecast (clean time): {period_time} -> {pv_value} kW (hours ahead: {hours_ahead:.1f})")
                                     else:
-                                        _LOGGER.debug(f"Skipping past time (clean): {period_time} (current: {current_time_naive})")
+                                        _LOGGER.debug(f"Skipping time (clean): {period_time} (hours ahead: {hours_ahead:.1f})")
                                 except ValueError as e2:
                                     _LOGGER.debug(f"Could not parse clean time '{clean_time}': {e2}")
                                     continue
@@ -237,6 +250,11 @@ class GeneticLoadOptimizer:
             if times:
                 _LOGGER.debug(f"Time range: {min(times)} to {max(times)}")
                 _LOGGER.debug(f"Value range: {min(values)} to {max(values)} kW")
+            else:
+                _LOGGER.warning("No forecast times were parsed - this indicates a problem with the time filtering logic")
+                _LOGGER.warning(f"Current time: {current_time}")
+                _LOGGER.warning(f"Today raw data sample: {pv_today_raw[:2] if pv_today_raw else 'None'}")
+                _LOGGER.warning(f"Tomorrow raw data sample: {pv_tomorrow_raw[:2] if pv_tomorrow_raw else 'None'}")
 
             if times:
                 # Sort by time to ensure chronological order
@@ -246,31 +264,11 @@ class GeneticLoadOptimizer:
                 values = list(values)
 
                 _LOGGER.info(f"Successfully parsed {len(times)} PV forecast data points from {times[0]} to {times[-1]}")
-
-                # Interpolate to 15-minute slots
-                for t in range(self.time_slots):
-                    slot_time = current_time + t * slot_duration
-                    
-                    if slot_time < times[0] or slot_time >= times[-1]:
-                        pv_forecast[t] = 0.0
-                        continue
-                        
-                    # Find bracketing times for interpolation
-                    for i in range(len(times) - 1):
-                        if times[i] <= slot_time < times[i + 1]:
-                            # Linear interpolation
-                            time_diff = (times[i + 1] - times[i]).total_seconds()
-                            slot_diff = (slot_time - times[i]).total_seconds()
-                            weight = slot_diff / time_diff
-                            pv_forecast[t] = values[i] * (1 - weight) + values[i + 1] * weight
-                            break
-                            
-                # Set the final forecast
-                self.pv_forecast = pv_forecast
-                _LOGGER.info(f"Generated PV forecast with {len(self.pv_forecast)} slots, max value: {max(pv_forecast):.3f} kW")
                 
+                # Create the final forecast array
+                self.pv_forecast = self._interpolate_forecast(times, values)
             else:
-                _LOGGER.warning("No valid Solcast forecast data parsed, using zeros")
+                _LOGGER.warning("No valid forecast times found, using fallback zero forecast")
                 self.pv_forecast = pv_forecast
 
         # Fetch load forecast
@@ -544,6 +542,46 @@ class GeneticLoadOptimizer:
                 for t in range(len(chromosome[d])):
                     chromosome[d][t] = 1.0 if chromosome[d][t] > 0.5 else 0.0
         return chromosome
+
+    def _interpolate_forecast(self, times, values):
+        """Interpolate forecast data to 15-minute time slots."""
+        from datetime import timedelta
+        
+        if not times or not values:
+            _LOGGER.warning("No times or values provided for interpolation")
+            return [0.0] * self.time_slots
+        
+        # Create 15-minute slot duration
+        slot_duration = timedelta(minutes=15)
+        current_time = datetime.now()
+        
+        # Initialize forecast array with zeros
+        pv_forecast = [0.0] * self.time_slots
+        
+        _LOGGER.debug(f"Interpolating {len(times)} data points to {self.time_slots} time slots")
+        _LOGGER.debug(f"Time range: {times[0]} to {times[-1]}")
+        _LOGGER.debug(f"Current time: {current_time}")
+        
+        # Interpolate to 15-minute slots
+        for t in range(self.time_slots):
+            slot_time = current_time + t * slot_duration
+            
+            if slot_time < times[0] or slot_time >= times[-1]:
+                pv_forecast[t] = 0.0
+                continue
+                
+            # Find bracketing times for interpolation
+            for i in range(len(times) - 1):
+                if times[i] <= slot_time < times[i + 1]:
+                    # Linear interpolation
+                    time_diff = (times[i + 1] - times[i]).total_seconds()
+                    slot_diff = (slot_time - times[i]).total_seconds()
+                    weight = slot_diff / time_diff
+                    pv_forecast[t] = values[i] * (1 - weight) + values[i + 1] * weight
+                    break
+        
+        _LOGGER.info(f"Generated PV forecast with {len(pv_forecast)} slots, max value: {max(pv_forecast):.3f} kW")
+        return pv_forecast
 
     async def tournament_selection(self, fitness_scores):
         tournament_size = 5
