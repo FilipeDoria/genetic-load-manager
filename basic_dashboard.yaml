@@ -1,0 +1,149 @@
+# Basic Genetic Load Manager Dashboard
+# Minimal dashboard using only basic Home Assistant components
+# This will definitely work - no custom cards or complex features
+
+title: "🧬 Genetic Load Manager - Basic"
+path: genetic-load-manager-basic
+icon: mdi:dna
+panel: false
+cards:
+
+# ==================================================
+# SIMPLE STATUS OVERVIEW
+# ==================================================
+- type: entities
+  title: "System Status"
+  show_header_toggle: false
+  entities:
+    - entity: sensor.genetic_load_manager_dashboard
+      name: "System Health"
+      icon: mdi:heart-pulse
+    
+    - entity: sensor.genetic_load_manager_indexed_pricing
+      name: "Current Price"
+      icon: mdi:currency-eur
+    
+    - entity: sensor.genetic_algorithm_status
+      name: "Optimization Status"
+      icon: mdi:dna
+    
+    - entity: sensor.cost_analytics
+      name: "Today's Savings"
+      icon: mdi:piggy-bank
+
+# ==================================================
+# DEVICE CONTROLS
+# ==================================================
+- type: entities
+  title: "Device Controls"
+  show_header_toggle: false
+  entities:
+    - entity: switch.device_0_schedule
+      name: "Device 0"
+      icon: mdi:power-plug
+    
+    - entity: switch.device_1_schedule
+      name: "Device 1"
+      icon: mdi:power-plug
+
+# ==================================================
+# OPTIMIZATION CONTROLS
+# ==================================================
+- type: entities
+  title: "Optimization Controls"
+  show_header_toggle: false
+  entities:
+    - type: call-service
+      name: "🚀 Run Optimization"
+      service: genetic_load_manager.run_optimization
+      icon: mdi:play-circle
+    
+    - type: call-service
+      name: "⏸️ Stop Optimization"
+      service: genetic_load_manager.stop_optimization
+      icon: mdi:stop-circle
+
+# ==================================================
+# SYSTEM INFORMATION
+# ==================================================
+- type: entities
+  title: "System Information"
+  show_header_toggle: false
+  entities:
+    - entity: binary_sensor.genetic_load_manager_optimization_running
+      name: "Optimization Running"
+      icon: mdi:play-circle
+    
+    - entity: binary_sensor.genetic_load_manager_system_healthy
+      name: "System Healthy"
+      icon: mdi:heart-pulse
+    
+    - entity: binary_sensor.genetic_load_manager_loads_controlled
+      name: "Loads Controlled"
+      icon: mdi:lightning-bolt
+    
+    - entity: binary_sensor.genetic_load_manager_algorithm_error
+      name: "Algorithm Errors"
+      icon: mdi:alert-circle
+
+# ==================================================
+# PRICING DETAILS
+# ==================================================
+- type: entities
+  title: "Pricing Information"
+  show_header_toggle: false
+  entities:
+    - type: attribute
+      entity: sensor.genetic_load_manager_indexed_pricing
+      attribute: pricing_components.market_price
+      name: "Market Price (OMIE)"
+      icon: mdi:chart-line
+      unit: "€/MWh"
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_indexed_pricing
+      attribute: pricing_components.final_price
+      name: "Final Price"
+      icon: mdi:calculator
+      unit: "€/kWh"
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_indexed_pricing
+      attribute: mfrr
+      name: "Frequency Reserve (MFRR)"
+      icon: mdi:sine-wave
+      unit: "€/MWh"
+
+# ==================================================
+# QUICK STATISTICS
+# ==================================================
+- type: entities
+  title: "Quick Statistics"
+  show_header_toggle: false
+  entities:
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.daily_cost_savings
+      name: "Daily Savings"
+      icon: mdi:piggy-bank
+      unit: "€"
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.system_efficiency
+      name: "System Efficiency"
+      icon: mdi:speedometer
+      unit: "%"
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.solar_production_today
+      name: "Solar Production Today"
+      icon: mdi:solar-power
+      unit: "kWh"
+    
+    - type: attribute
+      entity: sensor.genetic_load_manager_dashboard
+      attribute: quick_stats.next_optimization
+      name: "Next Optimization"
+      icon: mdi:clock-outline

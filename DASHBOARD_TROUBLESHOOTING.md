@@ -1,249 +1,178 @@
-# Dashboard Troubleshooting Guide - Genetic Load Manager
+# Dashboard Troubleshooting Guide
 
-## Common Dashboard Errors and Solutions
+## 🚨 Common Dashboard Issues & Solutions
 
-### 1. **ApexCharts Configuration Errors**
+### **❌ Problem: Dashboard Won't Load**
+**Symptoms:**
+- Dashboard shows "Error loading dashboard"
+- Blank white screen
+- "Invalid YAML" errors
 
-#### Error: `value.chart_type is not a ChartCardChartType`
-**Problem**: Invalid chart type specified
-**Solution**: Use only these valid chart types:
-- `line` - Line charts
-- `scatter` - Scatter plots  
-- `pie` - Pie charts
-- `donut` - Donut charts
-- `radialBar` - Radial bar charts
-- `column` - Column charts
-- `bar` - Bar charts
+**Solutions:**
+1. **Use the Basic Dashboard**: Start with `basic_dashboard.yaml` - it uses only standard components
+2. **Check YAML Syntax**: Validate your YAML in Home Assistant's YAML editor
+3. **Clear Browser Cache**: Hard refresh (Ctrl+F5) or clear browser cache
+4. **Check Entity Names**: Ensure all entity names match exactly
 
-**Fixed Example**:
+### **❌ Problem: Custom Cards Not Working**
+**Symptoms:**
+- "Custom element doesn't exist" errors
+- Missing card types
+- Dashboard partially loads
+
+**Solutions:**
+1. **Avoid Custom Cards**: Use only standard Home Assistant cards
+2. **Install HACS First**: If you want custom cards, install HACS first
+3. **Use Basic Components**: Stick to `entities`, `glance`, `call-service`
+
+### **❌ Problem: Entities Not Showing**
+**Symptoms:**
+- Empty dashboard sections
+- "Entity not found" errors
+- Missing data
+
+**Solutions:**
+1. **Check Entity Names**: Verify entity IDs in Developer Tools > States
+2. **Wait for Integration**: Some entities take time to appear after setup
+3. **Check Integration Status**: Ensure the integration is running without errors
+
+## 🔧 Dashboard Setup Steps
+
+### **Step 1: Start with Basic Dashboard**
 ```yaml
-# ❌ WRONG - 'area' is not valid
-chart_type: area
-
-# ✅ CORRECT - 'line' is valid
-chart_type: line
+# Copy basic_dashboard.yaml to your Home Assistant
+# This uses only standard components and will definitely work
 ```
 
-#### Error: `value.height is extraneous`
-**Problem**: `height` property is not supported in newer ApexCharts versions
-**Solution**: Remove all `height` properties from chart configurations
+### **Step 2: Verify Entities Exist**
+1. Go to **Developer Tools > States**
+2. Search for your integration entities:
+   - `sensor.genetic_load_manager_dashboard`
+   - `sensor.genetic_load_manager_indexed_pricing`
+   - `switch.device_0_schedule`
+   - `switch.device_1_schedule`
 
-**Fixed Example**:
-```yaml
-# ❌ WRONG - height property not supported
-- type: custom:apexcharts-card
-  chart_type: line
-  height: 200  # Remove this line
-  series: [...]
+### **Step 3: Test Individual Cards**
+1. Create a simple test dashboard with just one card
+2. Add cards one by one to identify problematic ones
+3. Use the YAML editor to validate syntax
 
-# ✅ CORRECT - no height property
-- type: custom:apexcharts-card
-  chart_type: line
-  series: [...]
+### **Step 4: Check Integration Status**
+1. Go to **Settings > Devices & Services**
+2. Find your integration and check its status
+3. Look for any error messages or warnings
+
+## 📱 Dashboard Types Available
+
+### **1. Basic Dashboard** (`basic_dashboard.yaml`)
+- ✅ **Guaranteed to work**
+- ✅ Uses only standard Home Assistant components
+- ✅ Simple, clean interface
+- ✅ No custom dependencies
+
+### **2. Modern Dashboard** (`modern_dashboard.yaml`)
+- ✅ Uses modern Home Assistant syntax
+- ✅ Responsive design
+- ✅ Standard components only
+- ⚠️ May need entity adjustments
+
+### **3. Advanced Dashboard** (`advanced_dashboard.yaml`)
+- ❌ **Requires custom cards** (button-card, apexcharts-card)
+- ❌ **May not work** without HACS installation
+- ❌ Complex configuration
+
+## 🎯 Recommended Approach
+
+### **For Immediate Use:**
+1. **Start with `basic_dashboard.yaml`**
+2. **Verify it works** in Home Assistant
+3. **Customize gradually** by adding more cards
+
+### **For Advanced Users:**
+1. **Install HACS** first
+2. **Install custom cards** (button-card, mini-graph-card)
+3. **Use `modern_dashboard.yaml`** as a base
+4. **Add custom features** incrementally
+
+## 🔍 Troubleshooting Commands
+
+### **Check Integration Status:**
+```bash
+# In Home Assistant logs, look for:
+# - "Error occurred loading flow for integration genetic_load_manager"
+# - "Failed to start optimizer"
+# - "No PV forecast data available"
 ```
 
-#### Error: `value.xaxis is extraneous`
-**Problem**: `xaxis` property structure has changed
-**Solution**: Update xaxis configuration format
-
-**Fixed Example**:
-```yaml
-# ❌ WRONG - old format
-xaxis:
-  - categories:
-      - "00:00"
-      - "01:00"
-
-# ✅ CORRECT - new format
-xaxis:
-  categories:
-    - "00:00"
-    - "01:00"
+### **Verify Entity Data:**
+```bash
+# In Developer Tools > States, check:
+# - Entity state values
+# - Entity attributes
+# - Entity availability
 ```
 
-### 2. **Data Generator Issues**
-
-#### Problem: JavaScript syntax errors in data_generator
-**Solution**: Use proper JavaScript syntax and remove comments
-
-**Fixed Example**:
-```yaml
-# ❌ WRONG - JavaScript comments cause issues
-data_generator: |
-  return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
-    x: slot.time,
-    y: slot.devices.device_0 * 1000  // Convert to watts
-  }));
-
-# ✅ CORRECT - no comments, clean syntax
-data_generator: |
-  return entity.attributes.schedule_data.predicted_schedule.map(slot => ({
-    x: slot.time,
-    y: slot.devices.device_0 * 1000
-  }));
+### **Test Services:**
+```bash
+# In Developer Tools > Services, test:
+# - genetic_load_manager.run_optimization
+# - genetic_load_manager.stop_optimization
 ```
 
-### 3. **Entity Reference Issues**
+## 📋 Dashboard Checklist
 
-#### Problem: Entities don't exist yet
-**Solution**: Create placeholder entities or use existing ones
+### **Before Creating Dashboard:**
+- [ ] Integration is installed and configured
+- [ ] All required entities exist
+- [ ] Integration is running without errors
+- [ ] You have basic Home Assistant knowledge
 
-**Quick Fix**: Replace non-existent entities with working ones:
-```yaml
-# ❌ WRONG - entity doesn't exist
-entity: sensor.genetic_load_manager_dashboard
+### **Dashboard Creation:**
+- [ ] Start with basic dashboard
+- [ ] Test each section individually
+- [ ] Verify entity names match exactly
+- [ ] Use YAML editor for syntax validation
 
-# ✅ CORRECT - use existing entity or create placeholder
-entity: sensor.system_health
-```
+### **After Creation:**
+- [ ] Dashboard loads without errors
+- [ ] All entities display correctly
+- [ ] Controls work as expected
+- [ ] Mobile view is responsive
 
-## Working Dashboard Templates
+## 🆘 Getting Help
 
-### Option 1: Simple Dashboard (Recommended)
-Use `simple_dashboard.yaml` - it avoids complex ApexCharts configurations and uses:
-- `mini-graph-card` for simple charts
-- Standard Lovelace cards
-- No complex data generators
+### **If Basic Dashboard Doesn't Work:**
+1. **Check Home Assistant logs** for integration errors
+2. **Verify entity names** in Developer Tools
+3. **Test integration services** manually
+4. **Restart Home Assistant** if needed
 
-### Option 2: Fixed Advanced Dashboard
-The `advanced_dashboard.yaml` has been fixed but requires:
-- ApexCharts v2.2.3+ installed
-- All referenced entities to exist
-- Proper data structure in entity attributes
+### **If You Want Advanced Features:**
+1. **Install HACS** first
+2. **Install required custom cards**
+3. **Use modern dashboard** as template
+4. **Customize incrementally**
 
-## Step-by-Step Dashboard Setup
+### **Common Error Messages:**
+- **"Entity not found"** → Check entity name spelling
+- **"Invalid YAML"** → Use YAML editor to validate syntax
+- **"Custom element doesn't exist"** → Install required custom cards
+- **"Dashboard not found"** → Check dashboard path and name
 
-### 1. Install Required Custom Cards
-```yaml
-# HACS > Frontend > Add Repository
-# Add these custom cards:
-- button-card
-- mini-graph-card
-- apexcharts-card (optional, for advanced charts)
-```
+## 💡 Pro Tips
 
-### 2. Create Required Entities
-```yaml
-# Developer Tools > YAML
-sensor:
-  - platform: template
-    sensors:
-      system_health:
-        friendly_name: "System Health"
-        value_template: "{{ 85 }}"
-        unit_of_measurement: "%"
-      
-      cost_analytics:
-        friendly_name: "Cost Analytics"
-        value_template: "{{ 12.50 }}"
-        unit_of_measurement: "€"
-      
-      genetic_algorithm_status:
-        friendly_name: "Genetic Algorithm Status"
-        value_template: "{{ 'idle' }}"
-```
+1. **Start Simple**: Always begin with basic components
+2. **Test Incrementally**: Add features one at a time
+3. **Use Developer Tools**: Verify entities and test services
+4. **Check Logs**: Home Assistant logs contain valuable error information
+5. **Backup Configs**: Save working dashboard configurations
 
-### 3. Test Dashboard
-1. Copy dashboard YAML to Lovelace
-2. Check for configuration errors
-3. Verify all entities exist
-4. Test chart functionality
+## 🎉 Success Indicators
 
-## Alternative Chart Solutions
-
-### If ApexCharts Doesn't Work
-
-#### Use Mini-Graph-Card Instead:
-```yaml
-# Simple, reliable charts
-- type: custom:mini-graph-card
-  name: "Pricing Trend"
-  entity: sensor.genetic_load_manager_indexed_pricing
-  line_color: "#FF9800"
-  hours_to_show: 24
-  animate: true
-```
-
-#### Use Standard Lovelace Charts:
-```yaml
-# Built-in chart support
-- type: history-graph
-  name: "24-Hour Pricing"
-  entities:
-    - entity: sensor.genetic_load_manager_indexed_pricing
-      color: "#FF9800"
-  hours_to_show: 24
-```
-
-## Dashboard Validation
-
-### Check Your Configuration:
-1. **YAML Syntax**: Use YAML validator
-2. **Entity Existence**: Verify all entities exist
-3. **Card Compatibility**: Ensure custom cards are installed
-4. **Data Structure**: Check entity attribute formats
-
-### Common Validation Commands:
-```yaml
-# Developer Tools > Templates
-{{ states('sensor.system_health') }}
-{{ state_attr('sensor.cost_analytics', 'chart_data') }}
-
-# Developer Tools > States
-# Search for your entities
-```
-
-## Emergency Dashboard
-
-If nothing works, use this minimal dashboard:
-```yaml
-title: "Genetic Load Manager - Basic"
-path: genetic-load-manager-basic
-cards:
-  - type: entities
-    title: "System Status"
-    entities:
-      - entity: sensor.system_health
-        name: "Health"
-      - entity: sensor.genetic_load_manager_indexed_pricing
-        name: "Price"
-  
-  - type: custom:button-card
-    name: "Run Optimization"
-    tap_action:
-      action: call-service
-      service: genetic_load_manager.run_optimization
-```
-
-## Getting Help
-
-### 1. Check Logs
-```yaml
-# Configuration > Logs
-# Look for: lovelace, frontend, custom_cards
-```
-
-### 2. Verify Custom Cards
-```yaml
-# HACS > Frontend
-# Check if custom cards are properly installed
-```
-
-### 3. Test Individual Cards
-```yaml
-# Create single card first
-# Test in isolation before building full dashboard
-```
-
-### 4. Use Working Examples
-- Start with `simple_dashboard.yaml`
-- Gradually add complexity
-- Test each addition before proceeding
-
-## Best Practices
-
-1. **Start Simple**: Begin with basic cards, add charts later
-2. **Test Incrementally**: Add one card at a time
-3. **Use Validators**: Check YAML syntax before loading
-4. **Backup Working Configs**: Save working dashboard configurations
-5. **Monitor Performance**: Complex dashboards can impact system performance
+Your dashboard is working correctly when:
+- ✅ Dashboard loads without errors
+- ✅ All entities display current values
+- ✅ Controls respond to user input
+- ✅ Mobile view is responsive
+- ✅ No error messages in logs
+- ✅ Integration status shows "Running"
