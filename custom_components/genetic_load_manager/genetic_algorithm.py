@@ -83,10 +83,13 @@ class GeneticLoadOptimizer:
         # Make current_time timezone-aware to match Solcast data
         try:
             from datetime import timezone
-            current_time = current_time.replace(tzinfo=timezone.utc)
+            # Use local timezone (+01:00) to match your Solcast data
+            current_time = current_time.replace(tzinfo=timezone(timedelta(hours=1)))
+            _LOGGER.debug(f"Using timezone-aware current_time: {current_time}")
         except ImportError:
             # Fallback for older Python versions
             current_time = current_time.replace(tzinfo=None)
+            _LOGGER.debug(f"Using timezone-naive current_time: {current_time}")
             
         slot_duration = timedelta(minutes=15)
         forecast_horizon = timedelta(hours=24)
@@ -176,27 +179,20 @@ class GeneticLoadOptimizer:
                             _LOGGER.debug(f"Processing item: period_start={period_start}, pv_estimate={pv_estimate}")
                             
                             # Parse the period_start string (handle timezone info)
-                            if period_start.endswith('+01:00'):
-                                period_start = period_start.replace('+01:00', '+01:00')
-                            elif period_start.endswith('Z'):
-                                period_start = period_start.replace('Z', '+00:00')
-                            
                             try:
                                 period_time = datetime.fromisoformat(period_start)
                                 pv_value = float(pv_estimate)
                                 
-                                # Handle timezone comparison
+                                # Handle timezone comparison - make both timezone-aware
                                 if period_time.tzinfo is None:
-                                    # If period_time is timezone-naive, make it timezone-aware
-                                    if current_time.tzinfo is not None:
-                                        # Assume local timezone if current_time is timezone-aware
-                                        period_time = period_time.replace(tzinfo=current_time.tzinfo)
-                                    else:
-                                        # Both are timezone-naive, can compare directly
-                                        pass
-                                elif current_time.tzinfo is None:
+                                    # If period_time is timezone-naive, assume it's in local time (+01:00)
+                                    period_time = period_time.replace(tzinfo=timezone(timedelta(hours=1)))
+                                    _LOGGER.debug(f"Made period_time timezone-aware: {period_time}")
+                                
+                                if current_time.tzinfo is None:
                                     # If current_time is timezone-naive, make it timezone-aware
                                     current_time = current_time.replace(tzinfo=period_time.tzinfo)
+                                    _LOGGER.debug(f"Made current_time timezone-aware: {current_time}")
                                 
                                 # Only include future times
                                 if period_time >= current_time:
@@ -340,36 +336,25 @@ class GeneticLoadOptimizer:
                 self.use_indexed_pricing = False
         
         if not self.use_indexed_pricing:
-            # Fallback to simple dynamic pricing entity
+            # Fallback to market price entity directly
             try:
-                pricing_state = await self.hass.async_add_executor_job(
-                    self.hass.states.get, self.dynamic_pricing_entity
-                )
-                if pricing_state and pricing_state.state not in ['unknown', 'unavailable']:
-                    try:
-                        # Try to get hourly prices from attributes
-                        hourly_prices = pricing_state.attributes.get("prices", [])
-                        if hourly_prices and len(hourly_prices) >= 24:
-                            # Convert to 96 time slots (15-minute intervals)
-                            self.pricing = []
-                            for hour_price in hourly_prices[:24]:  # Take first 24 hours
-                                # Repeat the hourly price for 4 time slots (15-minute intervals)
-                                for _ in range(4):
-                                    self.pricing.append(float(hour_price))
-                            _LOGGER.info("Using dynamic pricing entity with 96 time slots")
-                        else:
-                            # No hourly prices, use a single price repeated
-                            single_price = float(pricing_state.state)
-                            self.pricing = [single_price] * self.time_slots
-                            _LOGGER.info("Using single dynamic price repeated for 96 time slots")
-                    except (ValueError, TypeError) as e:
-                        _LOGGER.error(f"Error parsing dynamic pricing data: {e}")
-                        self.pricing = [0.1] * self.time_slots
+                # Use the market price entity from pricing calculator instead of fallback
+                market_prices = await self.pricing_calculator.get_current_market_price()
+                if isinstance(market_prices, list) and len(market_prices) == 24:
+                    # Convert 24 hourly prices to 96 time slots (15-minute intervals)
+                    self.pricing = []
+                    for hour_price in market_prices:
+                        # Repeat the hourly price for 4 time slots (15-minute intervals)
+                        for _ in range(4):
+                            self.pricing.append(float(hour_price))
+                    _LOGGER.info("Using market price entity with 96 time slots")
                 else:
-                    _LOGGER.warning(f"Dynamic pricing entity unavailable: {self.dynamic_pricing_entity}")
-                    self.pricing = [0.1] * self.time_slots
+                    # Single price, repeat for all time slots
+                    single_price = float(market_prices) if isinstance(market_prices, (int, float)) else 0.1
+                    self.pricing = [single_price] * self.time_slots
+                    _LOGGER.info("Using single market price repeated for 96 time slots")
             except Exception as e:
-                _LOGGER.error(f"Error getting dynamic pricing: {e}")
+                _LOGGER.error(f"Error getting market pricing: {e}")
                 self.pricing = [0.1] * self.time_slots
         
         # Ensure pricing is initialized even if both methods fail

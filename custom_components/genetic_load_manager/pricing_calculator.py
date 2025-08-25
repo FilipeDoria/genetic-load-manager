@@ -71,32 +71,93 @@ class IndexedTariffCalculator:
                 self.hass.states.get, self.market_price_entity
             )
             if state and state.state not in ['unknown', 'unavailable']:
+                _LOGGER.debug(f"Market price entity state: {state.state}")
+                _LOGGER.debug(f"Available attributes: {list(state.attributes.keys())}")
+                
                 try:
-                    hourly_prices = state.attributes.get("Today hours", {})
+                    # Try multiple possible attribute names for OMIE data
+                    hourly_prices = None
+                    
+                    # First try "Today hours" (OMIE format)
+                    if "Today hours" in state.attributes:
+                        hourly_prices = state.attributes.get("Today hours", {})
+                        _LOGGER.debug(f"Found 'Today hours' attribute with {len(hourly_prices)} entries")
+                        _LOGGER.debug(f"Sample keys: {list(hourly_prices.keys())[:3] if hourly_prices else 'None'}")
+                    
+                    # If no "Today hours", try "prices" attribute
+                    elif "prices" in state.attributes:
+                        hourly_prices = state.attributes.get("prices", [])
+                        _LOGGER.debug(f"Found 'prices' attribute with {len(hourly_prices)} entries")
+                    
+                    # If still no hourly data, try to parse the main state value
+                    elif state.state and state.state not in ['unknown', 'unavailable']:
+                        try:
+                            single_price = float(state.state)
+                            _LOGGER.info(f"Using single market price: {single_price}")
+                            # Convert from MWh to kWh and return
+                            return single_price / 1000.0
+                        except (ValueError, TypeError):
+                            _LOGGER.warning(f"Could not parse market price state: {state.state}")
+                    
                     if hourly_prices:
                         prices = []
-                        # Get current date for the hour keys
-                        current_date = datetime.now().strftime("%Y-%m-%d")
                         
-                        for hour in range(24):
-                            hour_key = f"{current_date}T{hour:02d}:00:00+01:00"
-                            price = hourly_prices.get(hour_key, 0.1)
-                            if price is None:
-                                price = 0.1
-                            # Convert from MWh to kWh (divide by 1000)
-                            prices.append(float(price) / 1000.0)
+                        if isinstance(hourly_prices, dict):
+                            # Handle OMIE format: {"2025-08-25T00:00:00+01:00": 107.5, ...}
+                            _LOGGER.debug("Parsing OMIE hourly price format")
+                            
+                            # Get current date for the hour keys
+                            current_date = datetime.now().strftime("%Y-%m-%d")
+                            
+                            for hour in range(24):
+                                # Try both timezone formats
+                                hour_key_1 = f"{current_date}T{hour:02d}:00:00+01:00"
+                                hour_key_2 = f"{current_date}T{hour:02d}:00:00+00:00"
+                                
+                                price = hourly_prices.get(hour_key_1) or hourly_prices.get(hour_key_2)
+                                
+                                if price is None:
+                                    # Try to find any key that matches this hour
+                                    for key, value in hourly_prices.items():
+                                        if f"T{hour:02d}:00:00" in key:
+                                            price = value
+                                            break
+                                
+                                if price is None:
+                                    _LOGGER.debug(f"No price found for hour {hour}, using default")
+                                    price = 0.1
+                                else:
+                                    _LOGGER.debug(f"Hour {hour}: {price} €/MWh")
+                                
+                                # Convert from MWh to kWh (divide by 1000)
+                                prices.append(float(price) / 1000.0)
+                                
+                        elif isinstance(hourly_prices, list):
+                            # Handle list format: [107.5, 104.99, ...]
+                            _LOGGER.debug("Parsing list hourly price format")
+                            
+                            for i, price in enumerate(hourly_prices[:24]):  # Take first 24 hours
+                                if price is None:
+                                    price = 0.1
+                                # Convert from MWh to kWh (divide by 1000)
+                                prices.append(float(price) / 1000.0)
+                            
+                            # Pad to 24 hours if needed
+                            while len(prices) < 24:
+                                prices.append(0.1)
                         
                         if len(prices) == 24:
                             self.market_prices = prices
-                            _LOGGER.info(f"Loaded {len(prices)} hourly market prices from {self.market_price_entity}")
+                            _LOGGER.info(f"Successfully loaded {len(prices)} hourly market prices from {self.market_price_entity}")
+                            _LOGGER.debug(f"Price range: {min(prices):.4f} to {max(prices):.4f} €/kWh")
                             return prices
                         else:
                             _LOGGER.warning(f"Expected 24 hourly prices, got {len(prices)}")
                     else:
                         _LOGGER.warning(f"No hourly prices found in {self.market_price_entity} attributes")
-                        _LOGGER.debug(f"Available attributes: {list(state.attributes.keys())}")
-                        if "Today hours" in state.attributes:
-                            _LOGGER.debug(f"Today hours content: {state.attributes['Today hours']}")
+                        _LOGGER.debug(f"Entity state: {state.state}")
+                        _LOGGER.debug(f"All attributes: {state.attributes}")
+                        
                 except (ValueError, TypeError, KeyError) as e:
                     _LOGGER.error(f"Error parsing market price data: {e}")
                     _LOGGER.debug(f"State attributes: {state.attributes}")
@@ -104,6 +165,9 @@ class IndexedTariffCalculator:
                 _LOGGER.warning(f"Market price entity unavailable: {self.market_price_entity}")
         else:
             _LOGGER.warning("No market price entity configured")
+        
+        # Return default price if all else fails
+        return 50.0 / 1000.0  # Default 0.05 €/kWh
     
     def calculate_indexed_price(self, market_price: float, timestamp: datetime = None) -> float:
         """
@@ -137,6 +201,47 @@ class IndexedTariffCalculator:
         final_price_kwh = (final_price / 1000) * self.currency_conversion
         
         return round(final_price_kwh, 6)
+    
+    def get_pricing_components(self, market_price: float) -> dict:
+        """
+        Get a breakdown of pricing components for display purposes.
+        
+        Args:
+            market_price: Market price (PM) in €/MWh
+            
+        Returns:
+            Dictionary with pricing component breakdown
+        """
+        if market_price is None:
+            market_price = 50.0  # Default fallback
+            
+        try:
+            # Base calculation: (PM * FP + Q + TAE + MFRR) * VAT
+            base_price = (market_price * self.fp + self.q + self.tae + self.mfrr) * self.vat
+            
+            # Convert from €/MWh to €/kWh
+            final_price_kwh = (base_price / 1000) * self.currency_conversion
+            
+            return {
+                "market_price": float(market_price),
+                "fp": float(self.fp),
+                "q": float(self.q),
+                "tae": float(self.tae),
+                "mfrr": float(self.mfrr),
+                "vat": float(self.vat),
+                "final_price": round(final_price_kwh, 6)
+            }
+        except (TypeError, ValueError) as e:
+            _LOGGER.error(f"Error calculating pricing components: {e}")
+            return {
+                "market_price": 50.0,
+                "fp": 1.0,
+                "q": 0.0,
+                "tae": 0.0,
+                "mfrr": 0.0,
+                "vat": 1.23,
+                "final_price": 0.0615
+            }
     
     def _get_time_of_use_multiplier(self, timestamp: datetime) -> float:
         """Get time-of-use multiplier based on hour of day."""
@@ -227,33 +332,6 @@ class IndexedTariffCalculator:
         """Get current electricity price."""
         market_price = await self.get_current_market_price()
         return self.calculate_indexed_price(market_price)
-    
-    def get_pricing_components(self, market_price: float) -> Dict[str, float]:
-        """
-        Get breakdown of pricing components for transparency.
-        
-        Args:
-            market_price: Current market price
-            
-        Returns:
-            Dictionary with component breakdown
-        """
-        pm_component = market_price * self.fp
-        base_total = pm_component + self.q + self.tae + self.mfrr
-        with_vat = base_total * self.vat
-        final_price = with_vat / 1000
-        
-        return {
-            "market_price": market_price,
-            "market_price_adjusted": pm_component,
-            "quality_component": self.q,
-            "transmission_tariff": self.tae,
-            "frequency_reserve": self.mfrr,
-            "subtotal": base_total,
-            "vat_amount": base_total * (self.vat - 1),
-            "total_with_vat": with_vat,
-            "final_price_kwh": final_price
-        }
     
     def update_config(self, config: Dict[str, Any]):
         """Update calculator configuration."""

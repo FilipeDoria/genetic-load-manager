@@ -271,12 +271,31 @@ class IndexedPricingSensor(SensorEntity):
             
             # Get current market price for component breakdown
             market_price = await self.pricing_calculator.get_current_market_price()
-            self._pricing_components = self.pricing_calculator.get_pricing_components(market_price)
+            
+            # Ensure market_price is not None before using it
+            if market_price is not None:
+                self._pricing_components = self.pricing_calculator.get_pricing_components(market_price)
+            else:
+                _LOGGER.warning("Market price is None, using default pricing components")
+                self._pricing_components = {
+                    "market_price": 50.0,
+                    "fp": 1.0,
+                    "q": 0.0,
+                    "tae": 0.0,
+                    "mfrr": 0.0,
+                    "vat": 1.23,
+                    "final_price": 0.0615
+                }
             
             # Get 24-hour forecast (sample every hour for attributes)
             forecast_96 = await self.pricing_calculator.get_24h_price_forecast()
-            # Sample every 4th value (hourly instead of 15-minute intervals) for attributes
-            self._forecast = [round(forecast_96[i], 6) for i in range(0, 96, 4)]
+            # Ensure forecast_96 is not None and has the expected length
+            if forecast_96 and len(forecast_96) == 96:
+                # Sample every 4th value (hourly instead of 15-minute intervals) for attributes
+                self._forecast = [round(forecast_96[i], 6) for i in range(0, 96, 4)]
+            else:
+                _LOGGER.warning("Invalid forecast data, using default forecast")
+                self._forecast = [0.1] * 24  # 24 hourly values
             
             _LOGGER.debug(f"Updated indexed pricing: {self._state} €/kWh (market: {market_price} €/MWh)")
             
