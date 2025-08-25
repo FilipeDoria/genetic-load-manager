@@ -65,18 +65,40 @@ class IndexedTariffCalculator:
                 self._warning_shown = True
             return 50.0  # Default fallback price in €/MWh
             
-        try:
-            state = self.hass.states.get(self.market_price_entity)
+        # Fetch market price data
+        if self.market_price_entity:
+            state = await self.hass.async_add_executor_job(
+                self.hass.states.get, self.market_price_entity
+            )
             if state and state.state not in ['unknown', 'unavailable']:
-                return float(state.state)
+                try:
+                    # Try to get hourly prices from attributes
+                    hourly_prices = state.attributes.get("Today hours", {})
+                    if hourly_prices:
+                        # Parse the hourly prices
+                        prices = []
+                        for hour in range(24):
+                            hour_key = f"2025-08-25T{hour:02d}:00:00+01:00"
+                            price = hourly_prices.get(hour_key, 0.1)
+                            if price is None:
+                                price = 0.1
+                            # Convert from MWh to kWh (divide by 1000)
+                            prices.append(float(price) / 1000.0)
+                        
+                        if len(prices) == 24:
+                            self.market_prices = prices
+                            _LOGGER.info(f"Loaded {len(prices)} hourly market prices from {self.market_price_entity}")
+                            return prices
+                        else:
+                            _LOGGER.warning(f"Expected 24 hourly prices, got {len(prices)}")
+                    else:
+                        _LOGGER.warning(f"No hourly prices found in {self.market_price_entity} attributes")
+                except (ValueError, TypeError, KeyError) as e:
+                    _LOGGER.error(f"Error parsing market price data: {e}")
             else:
-                if not self._warning_shown:
-                    _LOGGER.warning(f"Market price entity {self.market_price_entity} unavailable, using default")
-                    self._warning_shown = True
-                return 50.0
-        except (ValueError, TypeError) as e:
-            _LOGGER.error(f"Error getting market price: {e}")
-            return 50.0
+                _LOGGER.warning(f"Market price entity unavailable: {self.market_price_entity}")
+        else:
+            _LOGGER.warning("No market price entity configured")
     
     def calculate_indexed_price(self, market_price: float, timestamp: datetime = None) -> float:
         """

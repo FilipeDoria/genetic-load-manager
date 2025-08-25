@@ -305,3 +305,52 @@ test_optimization:
           step: 1
           default: 24
           unit_of_measurement: hours 
+
+genetic_load_manager:
+  get_full_schedule:
+    name: "Get Full Schedule Data"
+    description: "Retrieve the complete schedule data when attributes are truncated"
+    fields:
+      target:
+        name: "Target"
+        description: "The target to get schedule data for"
+        selector:
+          target:
+            entity:
+              domain: sensor
+              device_class: energy
+        required: true
+      data_type:
+        name: "Data Type"
+        description: "Type of schedule data to retrieve"
+        selector:
+          select:
+            options:
+              - "full_schedule"
+              - "compressed_schedule"
+              - "summary_only"
+              - "device_schedule"
+        default: "full_schedule"
+      device_id:
+        name: "Device ID"
+        description: "Specific device ID to get schedule for (only for device_schedule type)"
+        selector:
+          number:
+            min: 0
+            max: 10
+            step: 1
+        required: false
+
+  get_schedule_statistics:
+    name: "Get Schedule Statistics"
+    description: "Get statistical information about the current schedule"
+    fields:
+      target:
+        name: "Target"
+        description: "The target to get statistics for"
+        selector:
+          target:
+            entity:
+              domain: sensor
+              device_class: energy
+        required: true 

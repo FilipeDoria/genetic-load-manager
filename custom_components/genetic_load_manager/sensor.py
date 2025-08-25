@@ -90,29 +90,34 @@ class LoadForecastSensor(SensorEntity):
             self._async_unsub_track_time()
             self._async_unsub_track_time = None
 
-    async def async_update(self, now=None):
-        """Update the sensor with a new 24-hour load forecast based on last 24 hours of data."""
-        if not self.load_sensor_entity:
-            if not self._warning_shown:
-                _LOGGER.warning("No load sensor entity specified, setting forecast to defaults")
-                self._warning_shown = True
-            self._forecast = [0.1] * 96
-            self._state = 9.6
-            return
-
-        # Fetch last 24 hours of historical data
-        history = await self._get_last_24h_data()
-        if not history:
-            if not self._warning_shown:
-                _LOGGER.warning("No historical data available for last 24 hours, setting forecast to defaults")
-                self._warning_shown = True
-            self._forecast = [0.1] * 96
-            self._state = 9.6
-            return
-
-        # Generate forecast based on last 24 hours
-        self._forecast = await self._generate_forecast_from_last_24h(history)
-        self._state = round(sum(self._forecast), 2)
+    async def async_update(self):
+        """Update the sensor."""
+        try:
+            if self.load_sensor_entity:
+                load_state = await self.hass.async_add_executor_job(
+                    self.hass.states.get, self.load_sensor_entity
+                )
+                if load_state and load_state.state not in ['unknown', 'unavailable']:
+                    try:
+                        current_load = float(load_state.state)
+                        # Update forecast based on current load
+                        self._forecast = [current_load * 0.8] * 96  # Simple forecast
+                        self._state = current_load
+                    except (ValueError, TypeError) as e:
+                        _LOGGER.error(f"Error parsing load sensor data: {e}")
+                        if not self._warning_shown:
+                            _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
+                            self._warning_shown = True
+                else:
+                    if not self._warning_shown:
+                        _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
+                        self._warning_shown = True
+            else:
+                if not self._warning_shown:
+                    _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
+                    self._warning_shown = True
+        except Exception as e:
+            _LOGGER.error(f"Error updating load forecast sensor: {e}")
 
     async def _get_last_24h_data(self):
         """Fetch historical load data for the last 24 hours."""
@@ -364,34 +369,126 @@ class ScheduleVisualizationSensor(SensorEntity):
         self._schedule_data = {}
         self._last_update = None
 
+    def _get_schedule_summary(self):
+        """Get a concise summary of the schedule data."""
+        if not hasattr(self, '_schedule_data') or not self._schedule_data:
+            return {
+                "status": "No schedule data available",
+                "last_updated": "Never",
+                "total_devices": 0,
+                "optimization_status": "Not running"
+            }
+        
+        try:
+            # Extract key information for summary
+            schedule = self._schedule_data.get("predicted_schedule", [])
+            if not schedule:
+                return {
+                    "status": "Empty schedule",
+                    "last_updated": self._schedule_data.get("last_updated", "Unknown"),
+                    "total_devices": 0,
+                    "optimization_status": "No data"
+                }
+            
+            # Count active time slots per device
+            device_summary = []
+            for i, device_schedule in enumerate(schedule):
+                if isinstance(device_schedule, dict) and "devices" in device_schedule:
+                    # Count active slots (non-zero values)
+                    active_slots = sum(1 for val in device_schedule["devices"].values() if val > 0.1)
+                    device_summary.append({
+                        "device_id": i,
+                        "active_slots": active_slots,
+                        "total_slots": len(device_schedule["devices"])
+                    })
+                elif isinstance(device_schedule, list):
+                    # Handle list format
+                    active_slots = sum(1 for val in device_schedule if val > 0.1)
+                    device_summary.append({
+                        "device_id": i,
+                        "active_slots": active_slots,
+                        "total_slots": len(device_schedule)
+                    })
+            
+            return {
+                "status": "Schedule available",
+                "last_updated": self._schedule_data.get("last_updated", "Unknown"),
+                "total_devices": len(device_summary),
+                "device_summary": device_summary,
+                "optimization_status": self._schedule_data.get("optimization_status", "Unknown"),
+                "cost_estimate": self._schedule_data.get("cost_estimate", 0)
+            }
+        except Exception as e:
+            _LOGGER.error(f"Error creating schedule summary: {e}")
+            return {
+                "status": "Error creating summary",
+                "error": str(e),
+                "last_updated": "Unknown"
+            }
+
     @property
     def extra_state_attributes(self):
-        """Return schedule visualization data as attributes."""
-        # Limit attribute size to avoid database warnings
-        attrs = {
-            "last_updated": self._last_update.isoformat() if self._last_update else None,
-            "schedule_summary": self._get_schedule_summary(),
-            "optimization_status": self._state
+        """Return entity specific state attributes."""
+        if not hasattr(self, '_schedule_data') or not self._schedule_data:
+            return {}
+        
+        # Always include the summary (it's small and useful)
+        attributes = {
+            "summary": self._get_schedule_summary()
         }
         
         # Only include detailed data if it's small enough
-        if len(str(self._schedule_data)) < 8000:  # Conservative limit
-            attrs["detailed_schedule"] = self._schedule_data
-        else:
-            attrs["detailed_schedule"] = "Data too large for attributes (see logs for details)"
-            _LOGGER.debug(f"Schedule data size: {len(str(self._schedule_data))} characters")
+        try:
+            # Convert schedule data to string to check size
+            schedule_str = str(self._schedule_data)
+            if len(schedule_str) < 8000:  # Conservative limit well under 16KB
+                attributes["detailed_schedule"] = self._schedule_data
+                _LOGGER.debug("Including detailed schedule data in attributes")
+            else:
+                # Data is too large, provide compressed version
+                compressed_data = self._get_compressed_schedule()
+                compressed_str = str(compressed_data)
+                if len(compressed_str) < 8000:
+                    attributes["compressed_schedule"] = compressed_data
+                    _LOGGER.debug("Including compressed schedule data in attributes")
+                else:
+                    _LOGGER.warning("Schedule data too large even when compressed, only summary available")
+                    attributes["note"] = "Detailed data too large for attributes. Use services to access full data."
+        except Exception as e:
+            _LOGGER.error(f"Error processing schedule attributes: {e}")
+            attributes["error"] = f"Failed to process schedule data: {str(e)}"
         
-        return attrs
+        return attributes
 
-    def _get_schedule_summary(self):
-        """Get a summary of the schedule to keep attributes small."""
-        if not self._schedule_data:
-            return "No schedule data available"
+    def _get_compressed_schedule(self):
+        """Get a compressed version of the schedule data."""
+        if not hasattr(self, '_schedule_data') or not self._schedule_data:
+            return {}
         
-        summary = {
-            "total_devices": len(self._schedule_data.get("devices", [])),
-            "time_slots": len(self._schedule_data.get("time_slots", [])),
-            "total_energy": sum(self._schedule_data.get("energy_consumption", [0])),
-            "cost_estimate": self._schedule_data.get("cost_estimate", 0)
-        }
-        return summary
+        try:
+            compressed = {}
+            schedule = self._schedule_data.get("predicted_schedule", [])
+            
+            # Compress device schedules
+            compressed_devices = []
+            for i, device_schedule in enumerate(schedule):
+                if isinstance(device_schedule, dict) and "devices" in device_schedule:
+                    # Convert to list and round values to reduce precision
+                    device_data = list(device_schedule["devices"].values())
+                    compressed_device = [round(val, 2) for val in device_data]
+                    compressed_devices.append(compressed_device)
+                elif isinstance(device_schedule, list):
+                    # Round values to reduce precision
+                    compressed_device = [round(val, 2) for val in device_schedule]
+                    compressed_devices.append(compressed_device)
+            
+            compressed["predicted_schedule"] = compressed_devices
+            compressed["last_updated"] = self._schedule_data.get("last_updated", "Unknown")
+            compressed["optimization_status"] = self._schedule_data.get("optimization_status", "Unknown")
+            compressed["cost_estimate"] = round(self._schedule_data.get("cost_estimate", 0), 2)
+            
+            return compressed
+            
+        except Exception as e:
+            _LOGGER.error(f"Error compressing schedule data: {e}")
+            return {"error": f"Compression failed: {str(e)}"}

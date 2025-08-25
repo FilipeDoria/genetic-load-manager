@@ -54,6 +54,15 @@ class GeneticLoadOptimizer:
         self.max_discharge_rate = config.get("max_discharge_rate", 2.0)
         self.binary_control = config.get("binary_control", False)
         
+        # Initialize device priorities (default: all devices have equal priority)
+        self.device_priorities = config.get("device_priorities", [1.0] * self.num_devices)
+        if len(self.device_priorities) != self.num_devices:
+            # Extend or truncate to match num_devices
+            if len(self.device_priorities) < self.num_devices:
+                self.device_priorities.extend([1.0] * (self.num_devices - len(self.device_priorities)))
+            else:
+                self.device_priorities = self.device_priorities[:self.num_devices]
+        
         # Initialize pricing calculator
         self.pricing_calculator = IndexedTariffCalculator(hass, config)
         self.use_indexed_pricing = config.get("use_indexed_pricing", True)
@@ -77,7 +86,9 @@ class GeneticLoadOptimizer:
         pv_tomorrow_state = None
         
         if self.pv_forecast_today_entity:
-            pv_today_state = self.hass.states.get(self.pv_forecast_today_entity)
+            pv_today_state = await self.hass.async_add_executor_job(
+                self.hass.states.get, self.pv_forecast_today_entity
+            )
             if not pv_today_state:
                 _LOGGER.warning(f"PV forecast entity not found: {self.pv_forecast_today_entity}")
             else:
@@ -88,7 +99,9 @@ class GeneticLoadOptimizer:
             _LOGGER.warning("No PV forecast entity configured")
             
         if self.pv_forecast_tomorrow_entity:
-            pv_tomorrow_state = self.hass.states.get(self.pv_forecast_tomorrow_entity)
+            pv_tomorrow_state = await self.hass.async_add_executor_job(
+                self.hass.states.get, self.pv_forecast_tomorrow_entity
+            )
             if not pv_tomorrow_state:
                 _LOGGER.warning(f"PV tomorrow forecast entity not found: {self.pv_forecast_tomorrow_entity}")
             else:
@@ -203,7 +216,9 @@ class GeneticLoadOptimizer:
 
         # Fetch load forecast
         if self.load_forecast_entity:
-            load_state = self.hass.states.get(self.load_forecast_entity)
+            load_state = await self.hass.async_add_executor_job(
+                self.hass.states.get, self.load_forecast_entity
+            )
             if load_state and load_state.state not in ['unknown', 'unavailable']:
                 try:
                     forecast_data = load_state.attributes.get("forecast", [0.1] * self.time_slots)
@@ -227,7 +242,9 @@ class GeneticLoadOptimizer:
 
         # Fetch battery state and pricing
         if self.battery_soc_entity:
-            battery_state = self.hass.states.get(self.battery_soc_entity)
+            battery_state = await self.hass.async_add_executor_job(
+                self.hass.states.get, self.battery_soc_entity
+            )
             if battery_state and battery_state.state not in ['unknown', 'unavailable']:
                 try:
                     self.battery_soc = float(battery_state.state)
