@@ -72,13 +72,14 @@ class IndexedTariffCalculator:
             )
             if state and state.state not in ['unknown', 'unavailable']:
                 try:
-                    # Try to get hourly prices from attributes
                     hourly_prices = state.attributes.get("Today hours", {})
                     if hourly_prices:
-                        # Parse the hourly prices
                         prices = []
+                        # Get current date for the hour keys
+                        current_date = datetime.now().strftime("%Y-%m-%d")
+                        
                         for hour in range(24):
-                            hour_key = f"2025-08-25T{hour:02d}:00:00+01:00"
+                            hour_key = f"{current_date}T{hour:02d}:00:00+01:00"
                             price = hourly_prices.get(hour_key, 0.1)
                             if price is None:
                                 price = 0.1
@@ -93,8 +94,12 @@ class IndexedTariffCalculator:
                             _LOGGER.warning(f"Expected 24 hourly prices, got {len(prices)}")
                     else:
                         _LOGGER.warning(f"No hourly prices found in {self.market_price_entity} attributes")
+                        _LOGGER.debug(f"Available attributes: {list(state.attributes.keys())}")
+                        if "Today hours" in state.attributes:
+                            _LOGGER.debug(f"Today hours content: {state.attributes['Today hours']}")
                 except (ValueError, TypeError, KeyError) as e:
                     _LOGGER.error(f"Error parsing market price data: {e}")
+                    _LOGGER.debug(f"State attributes: {state.attributes}")
             else:
                 _LOGGER.warning(f"Market price entity unavailable: {self.market_price_entity}")
         else:

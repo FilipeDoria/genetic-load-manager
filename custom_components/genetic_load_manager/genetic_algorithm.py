@@ -67,6 +67,10 @@ class GeneticLoadOptimizer:
         self.pricing_calculator = IndexedTariffCalculator(hass, config)
         self.use_indexed_pricing = config.get("use_indexed_pricing", True)
         
+        # Initialize pricing-related attributes
+        self.dynamic_pricing_entity = config.get("dynamic_pricing_entity", "sensor.dynamic_electricity_price")
+        self.pricing = None  # Will be populated during forecast data fetch
+        
         # Initialize optimization tracking attributes
         self.best_fitness = float("-inf")
         self.best_solution = None
@@ -76,6 +80,14 @@ class GeneticLoadOptimizer:
     async def fetch_forecast_data(self):
         """Fetch and process Solcast PV, load, battery, and pricing data for a 24-hour horizon."""
         current_time = datetime.now().replace(second=0, microsecond=0)
+        # Make current_time timezone-aware to match Solcast data
+        try:
+            from datetime import timezone
+            current_time = current_time.replace(tzinfo=timezone.utc)
+        except ImportError:
+            # Fallback for older Python versions
+            current_time = current_time.replace(tzinfo=None)
+            
         slot_duration = timedelta(minutes=15)
         forecast_horizon = timedelta(hours=24)
         end_time = current_time + forecast_horizon
@@ -125,6 +137,7 @@ class GeneticLoadOptimizer:
             _LOGGER.debug(f"Today's forecast data: {len(pv_today_raw)} items")
             if pv_today_raw:
                 _LOGGER.debug(f"First item structure: {pv_today_raw[0]}")
+                _LOGGER.debug(f"First item keys: {list(pv_today_raw[0].keys()) if isinstance(pv_today_raw[0], dict) else 'Not a dict'}")
                 
         if pv_tomorrow_state:
             pv_tomorrow_raw = pv_tomorrow_state.attributes.get("DetailedForecast", [])
@@ -136,6 +149,7 @@ class GeneticLoadOptimizer:
             _LOGGER.debug(f"Tomorrow's forecast data: {len(pv_tomorrow_raw)} items")
             if pv_tomorrow_raw:
                 _LOGGER.debug(f"First item structure: {pv_tomorrow_raw[0]}")
+                _LOGGER.debug(f"First item keys: {list(pv_tomorrow_raw[0].keys()) if isinstance(pv_tomorrow_raw[0], dict) else 'Not a dict'}")
 
         if not pv_today_raw and not pv_tomorrow_raw:
             _LOGGER.warning("No Solcast PV forecast data available, using zeros")
@@ -145,16 +159,21 @@ class GeneticLoadOptimizer:
             times = []
             values = []
             
-            for forecast in [pv_today_raw, pv_tomorrow_raw]:
+            for forecast_name, forecast in [("today", pv_today_raw), ("tomorrow", pv_tomorrow_raw)]:
                 if not forecast:
+                    _LOGGER.debug(f"No {forecast_name} forecast data")
                     continue
                     
+                _LOGGER.debug(f"Processing {forecast_name} forecast with {len(forecast)} items")
+                
                 for item in forecast:
                     try:
                         # Handle both DetailedForecast and DetailedHourly structures
                         if isinstance(item, dict) and "period_start" in item and "pv_estimate" in item:
                             period_start = item["period_start"]
                             pv_estimate = item["pv_estimate"]
+                            
+                            _LOGGER.debug(f"Processing item: period_start={period_start}, pv_estimate={pv_estimate}")
                             
                             # Parse the period_start string (handle timezone info)
                             if period_start.endswith('+01:00'):
@@ -166,18 +185,62 @@ class GeneticLoadOptimizer:
                                 period_time = datetime.fromisoformat(period_start)
                                 pv_value = float(pv_estimate)
                                 
+                                # Handle timezone comparison
+                                if period_time.tzinfo is None:
+                                    # If period_time is timezone-naive, make it timezone-aware
+                                    if current_time.tzinfo is not None:
+                                        # Assume local timezone if current_time is timezone-aware
+                                        period_time = period_time.replace(tzinfo=current_time.tzinfo)
+                                    else:
+                                        # Both are timezone-naive, can compare directly
+                                        pass
+                                elif current_time.tzinfo is None:
+                                    # If current_time is timezone-naive, make it timezone-aware
+                                    current_time = current_time.replace(tzinfo=period_time.tzinfo)
+                                
                                 # Only include future times
                                 if period_time >= current_time:
                                     times.append(period_time)
                                     values.append(pv_value)
+                                    _LOGGER.debug(f"Added forecast: {period_time} -> {pv_value} kW")
+                                else:
+                                    _LOGGER.debug(f"Skipping past time: {period_time} (current: {current_time})")
                                     
                             except ValueError as e:
                                 _LOGGER.debug(f"Could not parse time '{period_start}': {e}")
-                                continue
+                                # Try alternative timezone handling
+                                try:
+                                    # Remove timezone info and try parsing
+                                    clean_time = period_start.split('+')[0].split('Z')[0]
+                                    period_time = datetime.fromisoformat(clean_time)
+                                    pv_value = float(pv_estimate)
+                                    
+                                    # Make both timezone-naive for comparison
+                                    if current_time.tzinfo is not None:
+                                        current_time_naive = current_time.replace(tzinfo=None)
+                                    else:
+                                        current_time_naive = current_time
+                                    
+                                    if period_time >= current_time_naive:
+                                        times.append(period_time)
+                                        values.append(pv_value)
+                                        _LOGGER.debug(f"Added forecast (clean time): {period_time} -> {pv_value} kW")
+                                    else:
+                                        _LOGGER.debug(f"Skipping past time (clean): {period_time} (current: {current_time_naive})")
+                                except ValueError as e2:
+                                    _LOGGER.debug(f"Could not parse clean time '{clean_time}': {e2}")
+                                    continue
+                        else:
+                            _LOGGER.debug(f"Item does not have required keys: {item}")
                                 
                     except (KeyError, ValueError, TypeError) as e:
                         _LOGGER.debug(f"Error parsing Solcast forecast item: {e}, item: {item}")
                         continue
+
+            _LOGGER.info(f"Total parsed forecast points: {len(times)}")
+            if times:
+                _LOGGER.debug(f"Time range: {min(times)} to {max(times)}")
+                _LOGGER.debug(f"Value range: {min(values)} to {max(values)} kW")
 
             if times:
                 # Sort by time to ensure chronological order
@@ -265,21 +328,65 @@ class GeneticLoadOptimizer:
         # Use indexed pricing calculator or fallback to simple pricing
         if self.use_indexed_pricing:
             try:
-                self.pricing = await self.pricing_calculator.get_24h_price_forecast(current_time)
-                _LOGGER.info("Using indexed tariff pricing with 96 time slots")
+                pricing_forecast = await self.pricing_calculator.get_24h_price_forecast(current_time)
+                if pricing_forecast and len(pricing_forecast) == self.time_slots:
+                    self.pricing = pricing_forecast
+                    _LOGGER.info("Using indexed tariff pricing with 96 time slots")
+                else:
+                    _LOGGER.warning(f"Indexed pricing returned invalid data: {pricing_forecast}, falling back to simple pricing")
+                    self.use_indexed_pricing = False
             except Exception as e:
                 _LOGGER.error(f"Error getting indexed pricing: {e}, falling back to simple pricing")
                 self.use_indexed_pricing = False
         
         if not self.use_indexed_pricing:
             # Fallback to simple dynamic pricing entity
-            pricing_state = self.hass.states.get(self.dynamic_pricing_entity)
-            self.pricing = [float(x) for x in pricing_state.attributes.get("prices", [0.1] * self.time_slots)] if pricing_state else [0.1] * self.time_slots
+            try:
+                pricing_state = await self.hass.async_add_executor_job(
+                    self.hass.states.get, self.dynamic_pricing_entity
+                )
+                if pricing_state and pricing_state.state not in ['unknown', 'unavailable']:
+                    try:
+                        # Try to get hourly prices from attributes
+                        hourly_prices = pricing_state.attributes.get("prices", [])
+                        if hourly_prices and len(hourly_prices) >= 24:
+                            # Convert to 96 time slots (15-minute intervals)
+                            self.pricing = []
+                            for hour_price in hourly_prices[:24]:  # Take first 24 hours
+                                # Repeat the hourly price for 4 time slots (15-minute intervals)
+                                for _ in range(4):
+                                    self.pricing.append(float(hour_price))
+                            _LOGGER.info("Using dynamic pricing entity with 96 time slots")
+                        else:
+                            # No hourly prices, use a single price repeated
+                            single_price = float(pricing_state.state)
+                            self.pricing = [single_price] * self.time_slots
+                            _LOGGER.info("Using single dynamic price repeated for 96 time slots")
+                    except (ValueError, TypeError) as e:
+                        _LOGGER.error(f"Error parsing dynamic pricing data: {e}")
+                        self.pricing = [0.1] * self.time_slots
+                else:
+                    _LOGGER.warning(f"Dynamic pricing entity unavailable: {self.dynamic_pricing_entity}")
+                    self.pricing = [0.1] * self.time_slots
+            except Exception as e:
+                _LOGGER.error(f"Error getting dynamic pricing: {e}")
+                self.pricing = [0.1] * self.time_slots
         
         # Ensure pricing is initialized even if both methods fail
-        if not hasattr(self, 'pricing') or self.pricing is None:
+        if not hasattr(self, 'pricing') or self.pricing is None or len(self.pricing) != self.time_slots:
             _LOGGER.warning("Both indexed and dynamic pricing failed, using default pricing")
             self.pricing = [0.1] * self.time_slots  # Default 0.1 €/kWh
+        
+        # Final validation
+        if len(self.pricing) != self.time_slots:
+            _LOGGER.warning(f"Pricing array size mismatch: got {len(self.pricing)}, expected {self.time_slots}")
+            # Resize to match time slots
+            if len(self.pricing) < self.time_slots:
+                self.pricing.extend([0.1] * (self.time_slots - len(self.pricing)))
+            elif len(self.pricing) > self.time_slots:
+                self.pricing = self.pricing[:self.time_slots]
+        
+        _LOGGER.debug(f"Final pricing array: {len(self.pricing)} slots, sample values: {self.pricing[:5]}")
         self.pv_forecast = pv_forecast
         _LOGGER.debug(f"PV forecast (96 slots): {pv_forecast}")
 

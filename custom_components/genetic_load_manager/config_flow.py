@@ -445,39 +445,37 @@ class GeneticLoadManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class GeneticLoadManagerOptionsFlow(config_entries.OptionsFlow):
     """Handle options."""
 
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
             # Update the config entry
-            new_data = self.config_entry.data.copy()
+            config_entry = self.config_entry
+            new_data = config_entry.data.copy()
             new_data.update(user_input)
             
             self.hass.config_entries.async_update_entry(
-                self.config_entry, data=new_data
+                config_entry, data=new_data
             )
             
             return self.async_create_entry(title="", data={})
 
         # Show current options
+        config_entry = self.config_entry
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
                 vol.Optional(
                     CONF_UPDATE_INTERVAL,
-                    default=self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+                    default=config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
                 ): vol.All(
                     vol.Coerce(int),
                     vol.Range(min=5, max=1440)
                 ),
                 vol.Optional(
                     CONF_OPTIMIZATION_MODE,
-                    default=self.config_entry.data.get(CONF_OPTIMIZATION_MODE, DEFAULT_OPTIMIZATION_MODE)
+                    default=config_entry.data.get(CONF_OPTIMIZATION_MODE, DEFAULT_OPTIMIZATION_MODE)
                 ): vol.In([
                     "cost_savings",
                     "comfort",
