@@ -52,6 +52,7 @@ genetic-load-manager/
 ### For Home Assistant Users (Final Integration)
 
 1. **Install via HACS** (recommended):
+
    - Add this repository to HACS
    - Install the integration
    - Configure via Home Assistant UI
@@ -64,6 +65,7 @@ genetic-load-manager/
 ### For Developers
 
 1. **Setup Development Environment**:
+
    ```bash
    cd development
    python -m venv venv
@@ -72,6 +74,7 @@ genetic-load-manager/
    ```
 
 2. **Run Tests**:
+
    ```bash
    cd development/testing
    python test_basic_functionality.py
@@ -96,22 +99,22 @@ genetic_load_manager:
   generations: 200
   mutation_rate: 0.05
   crossover_rate: 0.8
-  
+
   # Device Configuration
   num_devices: 2
   device_priorities: [1.0, 0.8]
-  
+
   # Energy Sources
   pv_forecast_entity: sensor.solcast_pv_forecast
   pv_forecast_tomorrow_entity: sensor.solcast_pv_forecast_tomorrow
   load_forecast_entity: sensor.load_forecast
-  
+
   # Battery Management
   battery_soc_entity: sensor.battery_soc
   battery_capacity: 10.0
   max_charge_rate: 2.0
   max_discharge_rate: 2.0
-  
+
   # Pricing
   use_indexed_pricing: true
   dynamic_pricing_entity: sensor.dynamic_pricing
@@ -125,6 +128,14 @@ The development environment includes comprehensive testing:
 - **Integration Tests**: Home Assistant entity integration
 - **Mock Tests**: Simulated data testing
 - **Real Entity Tests**: Live Home Assistant testing
+
+## 📚 Documentation
+
+- **README.md** - Project overview and quick start
+- **PROJECT_STRUCTURE.md** - Project organization guide
+- **DEPLOYMENT.md** - Installation and configuration guide
+- **TROUBLESHOOTING.md** - Complete troubleshooting guide
+- **DEVELOPMENT.md** - Development environment and workflow
 
 ## 📊 Features
 
@@ -154,7 +165,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - **Issues**: Report bugs and feature requests via GitHub Issues
 - **Discussions**: Join community discussions on GitHub
-- **Documentation**: Check `development/documentation/` for detailed guides
+- **Documentation**: Check the project documentation files for detailed guides
+- **Troubleshooting**: See `TROUBLESHOOTING.md` for common issues and solutions
 
 ## 🔄 Version History
 

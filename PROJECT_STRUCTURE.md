@@ -69,12 +69,14 @@ genetic-load-manager/                    # 🏠 Project Root
 ### What Was Moved
 
 #### From Root to `development/testing/`
+
 - ✅ `GA_EMS_HA/` → `development/testing/`
 - ✅ `test_*.py` → `development/testing/`
 - ✅ `*.png` (test images) → `development/testing/`
 - ✅ `configuration.yaml` → `development/testing/`
 
 #### From Root to `development/documentation/`
+
 - ✅ `ADDING_SENSORS_GUIDE.md` → `development/documentation/`
 - ✅ `INDEXED_PRICING_GUIDE.md` → `development/documentation/`
 - ✅ `ALGORITHM_IMPROVEMENTS.md` → `development/documentation/`
@@ -83,6 +85,7 @@ genetic-load-manager/                    # 🏠 Project Root
 - ✅ `PV_FORECAST_REFERENCE.md` → `development/documentation/`
 
 #### From Root to `development/`
+
 - ✅ `inputs.txt` → `development/`
 - ✅ `schedules.png` → `development/`
 - ✅ `venv/` → `development/`
@@ -90,30 +93,35 @@ genetic-load-manager/                    # 🏠 Project Root
 ### What Stayed in Root
 
 #### Final Integration Files
+
 - ✅ `custom_components/genetic_load_manager/` (HACS ready)
 - ✅ `README.md` (main project documentation)
 - ✅ `lovelace_cards.yaml` (user dashboard)
 - ✅ `advanced_dashboard.yaml` (advanced user config)
 
 #### Project Configuration
+
 - ✅ `.gitignore` (updated for new structure)
 - ✅ `.vscode/` (development tools)
 
 ## 🎯 Benefits of Reorganization
 
 ### For End Users
+
 1. **Clean Installation**: Only integration files in root
 2. **HACS Ready**: Proper structure for HACS installation
 3. **Clear Documentation**: User-focused README and deployment guide
 4. **Easy Updates**: Simple file replacement process
 
 ### For Developers
+
 1. **Separate Environment**: Development tools isolated from integration
 2. **Comprehensive Testing**: All test files organized in one place
 3. **Clear Workflow**: Development process documented
 4. **Research Tools**: Dedicated space for analysis and research
 
 ### For Project Maintenance
+
 1. **Clear Separation**: Easy to distinguish between dev and production
 2. **Version Control**: Better git ignore rules
 3. **Documentation**: Organized by purpose and audience
@@ -122,48 +130,58 @@ genetic-load-manager/                    # 🏠 Project Root
 ## 🚀 Usage Instructions
 
 ### For Home Assistant Users
+
 1. **Install via HACS**: Add repository to HACS and install
 2. **Manual Install**: Copy `custom_components/genetic_load_manager/` to your HA config
 3. **Configure**: Follow `DEPLOYMENT.md` guide
 4. **Monitor**: Use provided Lovelace cards
 
 ### For Developers
-1. **Setup Environment**: Follow `development/README.md`
+
+1. **Setup Environment**: Follow `DEVELOPMENT.md`
 2. **Make Changes**: Edit files in `custom_components/genetic_load_manager/`
 3. **Test Changes**: Use `development/testing/` scripts
-4. **Update Docs**: Modify relevant files in `development/documentation/`
+4. **Update Docs**: Modify relevant files in root documentation
 
 ## 🔧 Development Workflow
 
 ### 1. Development Cycle
+
 ```
 Edit Code → Test Locally → Test in HA → Update Docs → Commit
 ```
 
 ### 2. Testing Strategy
+
 - **Unit Tests**: `development/testing/test_*.py`
 - **Integration Tests**: `development/testing/ems_testing_integration.py`
 - **Real HA Tests**: `development/testing/test_real_ha_entities.py`
 
 ### 3. Documentation Updates
+
 - **User Docs**: Update root `README.md` and `DEPLOYMENT.md`
-- **Dev Docs**: Update `development/README.md` and relevant guides
+- **Dev Docs**: Update `DEVELOPMENT.md` and relevant guides
 - **Code Docs**: Update inline comments and docstrings
 
 ## 📋 File Purposes
 
 ### Root Level Files
+
 - `README.md`: Main project overview and user guide
 - `DEPLOYMENT.md`: Step-by-step deployment instructions
 - `PROJECT_STRUCTURE.md`: This file - project organization guide
+- `TROUBLESHOOTING.md`: Complete troubleshooting and debugging guide
+- `DEVELOPMENT.md`: Development environment and workflow guide
 - `.gitignore`: Git ignore rules for clean repository
 
 ### Integration Files (`custom_components/`)
+
 - All files needed for Home Assistant integration
 - HACS-compatible structure
 - Production-ready code
 
 ### Development Files (`development/`)
+
 - Testing and development tools
 - Research and analysis
 - Documentation for developers
@@ -176,13 +194,14 @@ The reorganization is successful when:
 ✅ **Users can install** the integration without seeing development files
 ✅ **Developers have** a clear, organized development environment
 ✅ **HACS integration** works seamlessly
-✅ **Documentation is** clear and accessible for both audiences
+✅ **Documentation is** clear, consolidated, and accessible for both audiences
 ✅ **Testing workflow** is straightforward and comprehensive
 ✅ **Project maintenance** is easier and more organized
 
 ## 🔮 Future Enhancements
 
 ### Potential Improvements
+
 1. **CI/CD Pipeline**: Automated testing and deployment
 2. **Docker Development**: Containerized development environment
 3. **Automated Documentation**: Generate docs from code
@@ -190,6 +209,7 @@ The reorganization is successful when:
 5. **User Analytics**: Integration usage statistics
 
 ### Documentation Enhancements
+
 1. **Video Tutorials**: Installation and configuration guides
 2. **Interactive Examples**: Jupyter notebooks for testing
 3. **API Reference**: Comprehensive API documentation
