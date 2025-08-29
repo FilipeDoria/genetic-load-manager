@@ -9,6 +9,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
 
 import logging
+import math
 
 _LOGGER = logging.getLogger(__name__)
 from .const import (
@@ -92,32 +93,156 @@ class LoadForecastSensor(SensorEntity):
 
     async def async_update(self):
         """Update the sensor."""
+        _LOGGER.debug(f"=== Updating LoadForecastSensor ===")
+        
         try:
             if self.load_sensor_entity:
-                load_state = await self.hass.async_add_executor_job(
-                    self.hass.states.get, self.load_sensor_entity
-                )
-                if load_state and load_state.state not in ['unknown', 'unavailable']:
-                    try:
-                        current_load = float(load_state.state)
-                        # Update forecast based on current load
-                        self._forecast = [current_load * 0.8] * 96  # Simple forecast
-                        self._state = current_load
-                    except (ValueError, TypeError) as e:
-                        _LOGGER.error(f"Error parsing load sensor data: {e}")
+                _LOGGER.debug(f"Fetching load data from entity: {self.load_sensor_entity}")
+                
+                try:
+                    load_state = await self.hass.async_add_executor_job(
+                        self.hass.states.get, self.load_sensor_entity
+                    )
+                    
+                    if not load_state:
+                        _LOGGER.error(f"Load sensor entity not found: {self.load_sensor_entity}")
+                        _LOGGER.error("This entity may not exist or may be misconfigured")
                         if not self._warning_shown:
-                            _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
+                            _LOGGER.error("Using default load forecast values")
                             self._warning_shown = True
-                else:
+                        return
+                    
+                    if load_state.state in ['unknown', 'unavailable']:
+                        _LOGGER.error(f"Load sensor entity unavailable: {self.load_sensor_entity}")
+                        _LOGGER.error(f"Entity state: {load_state.state}")
+                        if not self._warning_shown:
+                            _LOGGER.error("Using default load forecast values")
+                            self._warning_shown = True
+                        return
+                    
+                    _LOGGER.debug(f"Load sensor state: {load_state.state}")
+                    _LOGGER.debug(f"Available attributes: {list(load_state.attributes.keys())}")
+                    
+                    try:
+                        # Try to get forecast data from attributes
+                        forecast_data = load_state.attributes.get("forecast", None)
+                        
+                        if forecast_data is None:
+                            _LOGGER.warning(f"No 'forecast' attribute found in {self.load_sensor_entity}")
+                            _LOGGER.warning("Available attributes: " + str(list(load_state.attributes.keys())))
+                            
+                            # Try alternative attribute names
+                            alternative_attrs = ['load_forecast', 'energy_forecast', 'consumption_forecast']
+                            for alt_attr in alternative_attrs:
+                                if alt_attr in load_state.attributes:
+                                    forecast_data = load_state.attributes[alt_attr]
+                                    _LOGGER.info(f"Using alternative attribute '{alt_attr}' for forecast data")
+                                    break
+                            
+                            if forecast_data is None:
+                                _LOGGER.warning("No forecast data found, generating smart forecast")
+                                forecast_data = await self._generate_smart_load_forecast()
+                        
+                        _LOGGER.debug(f"Raw forecast data: {len(forecast_data)} items")
+                        _LOGGER.debug(f"Sample data: {forecast_data[:5] if forecast_data else 'None'}")
+                        
+                        # Validate and convert forecast data
+                        if isinstance(forecast_data, list):
+                            try:
+                                self._forecast = []
+                                for i, value in enumerate(forecast_data):
+                                    try:
+                                        if value is None:
+                                            _LOGGER.debug(f"None value at index {i}, using default")
+                                            self._forecast.append(0.1)
+                                        else:
+                                            float_val = float(value)
+                                            if not math.isfinite(float_val):
+                                                _LOGGER.warning(f"Non-finite value at index {i}: {value}, using default")
+                                                self._forecast.append(0.1)
+                                            else:
+                                                self._forecast.append(float_val)
+                                    except (ValueError, TypeError) as e:
+                                        _LOGGER.warning(f"Invalid value at index {i}: {value}, error: {e}, using default")
+                                        self._forecast.append(0.1)
+                                
+                                # Ensure we have the right number of time slots
+                                if len(self._forecast) != 96:
+                                    _LOGGER.warning(f"Forecast length mismatch: got {len(self._forecast)}, expected 96")
+                                                                    if len(self._forecast) < 96:
+                                    # Extend with realistic default values based on time of day
+                                    extension_values = self._get_realistic_extension_values(len(self._forecast), 96)
+                                    self._forecast.extend(extension_values)
+                                    _LOGGER.info(f"Extended forecast to 96 slots with realistic values")
+                                    else:
+                                        # Truncate to 96 slots
+                                        self._forecast = self._forecast[:96]
+                                        _LOGGER.info(f"Truncated forecast to 96 slots")
+                                
+                                # Calculate total energy
+                                self._state = sum(self._forecast)
+                                
+                                _LOGGER.info(f"Successfully updated load forecast: {len(self._forecast)} slots, total: {self._state:.3f} kWh")
+                                _LOGGER.debug(f"Forecast range: {min(self._forecast):.3f} to {max(self._forecast):.3f} kWh")
+                                
+                            except Exception as e:
+                                _LOGGER.error(f"Error processing forecast data: {e}")
+                                _LOGGER.error(f"Exception type: {type(e).__name__}")
+                                _LOGGER.error(f"Raw forecast data: {forecast_data}")
+                                # Use default values
+                                self._forecast = [0.1] * 96
+                                self._state = 9.6
+                                
+                        else:
+                            _LOGGER.warning(f"Forecast data is not a list: {type(forecast_data)}")
+                            _LOGGER.warning("Using default load forecast values")
+                            self._forecast = [0.1] * 96
+                            self._state = 9.6
+                            
+                    except (ValueError, TypeError) as e:
+                        _LOGGER.error(f"Error parsing load forecast data: {e}")
+                        _LOGGER.error(f"Exception type: {type(e).__name__}")
+                        _LOGGER.error(f"Raw forecast data: {forecast_data}")
+                        # Generate smart forecast as fallback
+                        try:
+                            self._forecast = await self._generate_smart_load_forecast()
+                            self._state = sum(self._forecast)
+                            _LOGGER.info("Generated smart forecast as fallback")
+                        except Exception as forecast_error:
+                            _LOGGER.error(f"Failed to generate smart forecast: {forecast_error}")
+                            # Use minimal default values as last resort
+                            self._forecast = [0.1] * 96
+                            self._state = 9.6
+                        
+                except Exception as e:
+                    _LOGGER.error(f"Exception while fetching load sensor data: {e}")
+                    _LOGGER.error(f"Exception type: {type(e).__name__}")
                     if not self._warning_shown:
-                        _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
+                        _LOGGER.error("Using default load forecast values")
                         self._warning_shown = True
+                    return
+                    
             else:
+                _LOGGER.warning("No load sensor entity configured")
                 if not self._warning_shown:
-                    _LOGGER.warning("No load sensor entity specified, setting forecast to zeros")
+                    _LOGGER.warning("Using default load forecast values")
                     self._warning_shown = True
+                    
         except Exception as e:
-            _LOGGER.error(f"Error updating load forecast sensor: {e}")
+            _LOGGER.error(f"Unexpected error in LoadForecastSensor update: {e}")
+            _LOGGER.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            _LOGGER.error(f"Traceback: {traceback.format_exc()}")
+            # Generate smart forecast as fallback
+            try:
+                self._forecast = await self._generate_smart_load_forecast()
+                self._state = sum(self._forecast)
+                _LOGGER.info("Generated smart forecast as fallback")
+            except Exception as forecast_error:
+                _LOGGER.error(f"Failed to generate smart forecast: {forecast_error}")
+                # Use minimal default values as last resort
+                self._forecast = [0.1] * 96
+                self._state = 9.6
 
     async def _get_last_24h_data(self):
         """Fetch historical load data for the last 24 hours."""
@@ -187,15 +312,104 @@ class LoadForecastSensor(SensorEntity):
         minute = timestamp.minute
         
         # Calculate slot index (0-95) based on time of day
-        # Slot 0 = 00:00-00:14, Slot 1 = 00:15-00:29, etc.
         slot_idx = hour * 4 + minute // 15
+        return slot_idx if 0 <= slot_idx < 96 else None
+
+    async def _generate_smart_load_forecast(self):
+        """Generates a smart load forecast based on historical data and daily patterns."""
+        _LOGGER.info("Generating smart load forecast for sensor...")
         
-        # Ensure slot index is within bounds
-        if 0 <= slot_idx < 96:
-            return slot_idx
-        else:
-            _LOGGER.warning(f"Timestamp {timestamp} maps to invalid slot index: {slot_idx}")
-            return None
+        try:
+            # Try to get historical data first
+            history = await self._get_last_24h_data()
+            
+            if history and len(history) > 10:  # Need sufficient data points
+                _LOGGER.info(f"Using {len(history)} historical data points for smart forecast")
+                forecast = await self._generate_forecast_from_last_24h(history)
+                
+                # Validate the generated forecast
+                if any(x > 0.1 for x in forecast):
+                    _LOGGER.info("Smart forecast generated successfully with historical data")
+                    return forecast
+                else:
+                    _LOGGER.warning("Generated forecast contains only default values, using pattern-based approach")
+            else:
+                _LOGGER.warning("Insufficient historical data, using pattern-based approach")
+            
+            # Fallback to pattern-based forecasting
+            return self._generate_pattern_based_forecast()
+            
+        except Exception as e:
+            _LOGGER.error(f"Error generating smart forecast: {e}")
+            _LOGGER.warning("Using pattern-based forecast as fallback")
+            return self._generate_pattern_based_forecast()
+
+    def _generate_pattern_based_forecast(self):
+        """Generates a realistic load forecast based on typical daily patterns."""
+        _LOGGER.info("Generating pattern-based load forecast...")
+        
+        # Create a realistic daily load pattern (96 x 15-minute slots)
+        # Based on typical household energy usage patterns
+        
+        # Morning peak (6-9 AM): cooking, showers, heating
+        morning_peak = [0.8, 1.2, 1.5, 1.8, 2.0, 1.8, 1.5, 1.2, 0.8, 0.6, 0.5, 0.4]
+        
+        # Daytime (9 AM - 5 PM): lower usage, some appliances
+        daytime = [0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+        daytime.extend([0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+        daytime.extend([0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+        daytime.extend([0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+        
+        # Evening peak (5-10 PM): cooking, lighting, entertainment, heating
+        evening_peak = [1.0, 1.5, 2.0, 2.5, 3.0, 2.8, 2.5, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.3, 0.3]
+        
+        # Night (10 PM - 6 AM): minimal usage, some standby devices
+        night = [0.3, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+        
+        # Combine all patterns
+        daily_pattern = morning_peak + daytime + evening_peak + night
+        
+        # Ensure we have exactly 96 slots
+        if len(daily_pattern) != 96:
+            _LOGGER.warning(f"Daily pattern length mismatch: {len(daily_pattern)} != 96")
+            # Pad or truncate to 96 slots
+            if len(daily_pattern) < 96:
+                daily_pattern.extend([0.3] * (96 - len(daily_pattern)))
+            else:
+                daily_pattern = daily_pattern[:96]
+        
+        _LOGGER.info(f"Generated pattern-based forecast: {len(daily_pattern)} slots, total: {sum(daily_pattern):.2f} kWh")
+        _LOGGER.debug(f"Pattern range: {min(daily_pattern):.2f} - {max(daily_pattern):.2f} kW")
+        
+        return daily_pattern
+
+    def _get_realistic_extension_values(self, current_length, target_length):
+        """Generate realistic extension values based on time of day."""
+        extension_length = target_length - current_length
+        if extension_length <= 0:
+            return []
+        
+        # Calculate what time of day the extension represents
+        # Each slot is 15 minutes, so we can determine the hour
+        start_hour = (current_length // 4) % 24
+        
+        extension_values = []
+        for i in range(extension_length):
+            hour = (start_hour + (i // 4)) % 24
+            
+            # Generate realistic values based on time of day
+            if 6 <= hour <= 9:  # Morning peak
+                value = 0.8 + (i % 4) * 0.1  # 0.8 to 1.1 kW
+            elif 17 <= hour <= 22:  # Evening peak
+                value = 1.5 + (i % 4) * 0.2  # 1.5 to 2.3 kW
+            elif 23 <= hour or hour <= 5:  # Night
+                value = 0.2 + (i % 4) * 0.05  # 0.2 to 0.35 kW
+            else:  # Daytime
+                value = 0.4 + (i % 4) * 0.1  # 0.4 to 0.7 kW
+            
+            extension_values.append(round(value, 2))
+        
+        return extension_values
 
     async def _get_historical_data(self):
         """Legacy method - kept for compatibility but not used."""

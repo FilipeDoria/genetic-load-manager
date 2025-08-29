@@ -2,6 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
+import math
 
 from homeassistant.core import HomeAssistant
 
@@ -59,6 +60,8 @@ class IndexedTariffCalculator:
         
     async def get_current_market_price(self) -> float:
         """Get current market price from configured entity."""
+        _LOGGER.info(f"=== Fetching market price from entity: {self.market_price_entity} ===")
+        
         if not self.market_price_entity:
             if not self._warning_shown:
                 _LOGGER.warning("No market price entity configured, using default price")
@@ -67,10 +70,21 @@ class IndexedTariffCalculator:
             
         # Fetch market price data
         if self.market_price_entity:
-            state = await self.hass.async_add_executor_job(
-                self.hass.states.get, self.market_price_entity
-            )
-            if state and state.state not in ['unknown', 'unavailable']:
+            try:
+                state = await self.hass.async_add_executor_job(
+                    self.hass.states.get, self.market_price_entity
+                )
+                
+                if not state:
+                    _LOGGER.error(f"Market price entity not found: {self.market_price_entity}")
+                    _LOGGER.error("This entity may not exist or may be misconfigured")
+                    return 50.0 / 1000.0  # Default fallback
+                
+                if state.state in ['unknown', 'unavailable']:
+                    _LOGGER.error(f"Market price entity unavailable: {self.market_price_entity}")
+                    _LOGGER.error(f"Entity state: {state.state}")
+                    return 50.0 / 1000.0  # Default fallback
+                
                 _LOGGER.debug(f"Market price entity state: {state.state}")
                 _LOGGER.debug(f"Available attributes: {list(state.attributes.keys())}")
                 
@@ -96,8 +110,10 @@ class IndexedTariffCalculator:
                             _LOGGER.info(f"Using single market price: {single_price}")
                             # Convert from MWh to kWh and return
                             return single_price / 1000.0
-                        except (ValueError, TypeError):
-                            _LOGGER.warning(f"Could not parse market price state: {state.state}")
+                        except (ValueError, TypeError) as e:
+                            _LOGGER.error(f"Could not parse market price state: {state.state}")
+                            _LOGGER.error(f"Parse error: {e}")
+                            _LOGGER.error(f"Expected numeric value, got: {type(state.state)}")
                     
                     if hourly_prices:
                         prices = []
@@ -108,6 +124,7 @@ class IndexedTariffCalculator:
                             
                             # Get current date for the hour keys
                             current_date = datetime.now().strftime("%Y-%m-%d")
+                            _LOGGER.debug(f"Current date: {current_date}")
                             
                             for hour in range(24):
                                 # Try both timezone formats
@@ -129,8 +146,18 @@ class IndexedTariffCalculator:
                                 else:
                                     _LOGGER.debug(f"Hour {hour}: {price} €/MWh")
                                 
+                                # Validate price value
+                                try:
+                                    price_float = float(price)
+                                    if not math.isfinite(price_float):
+                                        _LOGGER.warning(f"Non-finite price for hour {hour}: {price}, using default")
+                                        price_float = 0.1
+                                except (ValueError, TypeError) as e:
+                                    _LOGGER.warning(f"Invalid price for hour {hour}: {price}, error: {e}, using default")
+                                    price_float = 0.1
+                                
                                 # Convert from MWh to kWh (divide by 1000)
-                                prices.append(float(price) / 1000.0)
+                                prices.append(price_float / 1000.0)
                                 
                         elif isinstance(hourly_prices, list):
                             # Handle list format: [107.5, 104.99, ...]
@@ -138,35 +165,53 @@ class IndexedTariffCalculator:
                             
                             for i, price in enumerate(hourly_prices[:24]):  # Take first 24 hours
                                 if price is None:
+                                    _LOGGER.debug(f"None price at index {i}, using default")
                                     price = 0.1
+                                
+                                # Validate price value
+                                try:
+                                    price_float = float(price)
+                                    if not math.isfinite(price_float):
+                                        _LOGGER.warning(f"Non-finite price at index {i}: {price}, using default")
+                                        price_float = 0.1
+                                except (ValueError, TypeError) as e:
+                                    _LOGGER.warning(f"Invalid price at index {i}: {price}, error: {e}, using default")
+                                    price_float = 0.1
+                                
                                 # Convert from MWh to kWh (divide by 1000)
-                                prices.append(float(price) / 1000.0)
+                                prices.append(price_float / 1000.0)
                             
                             # Pad to 24 hours if needed
                             while len(prices) < 24:
+                                _LOGGER.debug(f"Padding prices to 24 hours, current length: {len(prices)}")
                                 prices.append(0.1)
                         
                         if len(prices) == 24:
                             self.market_prices = prices
                             _LOGGER.info(f"Successfully loaded {len(prices)} hourly market prices from {self.market_price_entity}")
                             _LOGGER.debug(f"Price range: {min(prices):.4f} to {max(prices):.4f} €/kWh")
+                            _LOGGER.debug(f"Sample prices: {prices[:5]}")
                             return prices
                         else:
-                            _LOGGER.warning(f"Expected 24 hourly prices, got {len(prices)}")
+                            _LOGGER.error(f"Expected 24 hourly prices, got {len(prices)}")
+                            _LOGGER.error("This indicates a data format problem")
                     else:
-                        _LOGGER.warning(f"No hourly prices found in {self.market_price_entity} attributes")
-                        _LOGGER.debug(f"Entity state: {state.state}")
-                        _LOGGER.debug(f"All attributes: {state.attributes}")
+                        _LOGGER.error(f"No hourly prices found in {self.market_price_entity} attributes")
+                        _LOGGER.error(f"Entity state: {state.state}")
+                        _LOGGER.error(f"All attributes: {state.attributes}")
                         
                 except (ValueError, TypeError, KeyError) as e:
                     _LOGGER.error(f"Error parsing market price data: {e}")
-                    _LOGGER.debug(f"State attributes: {state.attributes}")
+                    _LOGGER.error(f"Exception type: {type(e).__name__}")
+                    _LOGGER.error(f"State attributes: {state.attributes}")
             else:
-                _LOGGER.warning(f"Market price entity unavailable: {self.market_price_entity}")
+                _LOGGER.error(f"Market price entity unavailable: {self.market_price_entity}")
+                _LOGGER.error(f"Entity state: {state.state if state else 'None'}")
         else:
-            _LOGGER.warning("No market price entity configured")
+            _LOGGER.error("No market price entity configured")
         
         # Return default price if all else fails
+        _LOGGER.warning("Using default fallback price due to data fetching/parsing failures")
         return 50.0 / 1000.0  # Default 0.05 €/kWh
     
     def calculate_indexed_price(self, market_price: float, timestamp: datetime = None) -> float:

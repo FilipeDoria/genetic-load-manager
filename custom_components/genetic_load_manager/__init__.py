@@ -13,6 +13,8 @@ PLATFORMS = ["sensor", "binary_sensor", "switch"]
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up Genetic Load Manager from configuration."""
+    _LOGGER.info("=== Setting up Genetic Load Manager integration ===")
+    
     hass.data[DOMAIN] = {}
     conf = config.get(DOMAIN, {})
     
@@ -23,14 +25,32 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             from .genetic_algorithm import GeneticLoadOptimizer
             genetic_algo = GeneticLoadOptimizer(hass, conf)
             hass.data[DOMAIN]["genetic_algorithm"] = genetic_algo
+            
+            # Initialize debug service
+            try:
+                from .debug_service import GeneticLoadManagerDebugService
+                debug_service = GeneticLoadManagerDebugService(hass, genetic_algo)
+                await debug_service.register_services()
+                hass.data[DOMAIN]["debug_service"] = debug_service
+                _LOGGER.info("Debug service initialized successfully")
+            except Exception as e:
+                _LOGGER.warning(f"Could not initialize debug service: {e}")
+                _LOGGER.warning("Debug capabilities will not be available")
+            
         except Exception as e:
-            _LOGGER.warning(f"Could not initialize genetic algorithm with config: {e}")
+            _LOGGER.error(f"Could not initialize genetic algorithm with config: {e}")
+            _LOGGER.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            _LOGGER.error(f"Traceback: {traceback.format_exc()}")
     
     await async_register_services(hass)
+    _LOGGER.info("Genetic Load Manager integration setup completed")
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Genetic Load Manager from a config entry."""
+    _LOGGER.info("=== Setting up Genetic Load Manager from config entry ===")
+    
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry.data
     
@@ -40,11 +60,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         genetic_algo = GeneticLoadOptimizer(hass, entry.data)
         hass.data[DOMAIN]['genetic_algorithm'] = genetic_algo
         
+        # Initialize debug service
+        try:
+            from .debug_service import GeneticLoadManagerDebugService
+            debug_service = GeneticLoadManagerDebugService(hass, genetic_algo)
+            await debug_service.register_services()
+            hass.data[DOMAIN]["debug_service"] = debug_service
+            _LOGGER.info("Debug service initialized successfully")
+        except Exception as e:
+            _LOGGER.warning(f"Could not initialize debug service: {e}")
+            _LOGGER.warning("Debug capabilities will not be available")
+        
         # Start the optimizer asynchronously
+        _LOGGER.info("Starting genetic algorithm optimizer...")
         await genetic_algo.start()
         _LOGGER.info("Genetic Load Manager optimizer started successfully")
     except Exception as e:
         _LOGGER.error(f"Failed to start optimizer: {e}")
+        _LOGGER.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        _LOGGER.error(f"Traceback: {traceback.format_exc()}")
         return False
     
     # Forward the setup to all platforms including sensor
@@ -52,6 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await async_register_services(hass)
     
     # Start periodic optimization and store the tracker
+    _LOGGER.info("Scheduling periodic optimization...")
     hass.data[DOMAIN]["async_remove_tracker"] = await genetic_algo.schedule_optimization()
     
     _LOGGER.info("Genetic Load Manager integration setup completed successfully")
@@ -59,15 +95,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    _LOGGER.info("=== Unloading Genetic Load Manager integration ===")
+    
     if 'genetic_algorithm' in hass.data[DOMAIN]:
         try:
             await hass.data[DOMAIN]['genetic_algorithm'].stop()
+            _LOGGER.info("Genetic algorithm optimizer stopped successfully")
         except Exception as e:
             _LOGGER.error(f"Error stopping optimizer: {e}")
+            _LOGGER.error(f"Exception type: {type(e).__name__}")
     
     if "async_remove_tracker" in hass.data[DOMAIN]:
-        hass.data[DOMAIN]["async_remove_tracker"]()
-        del hass.data[DOMAIN]["async_remove_tracker"]
+        try:
+            hass.data[DOMAIN]["async_remove_tracker"]()
+            del hass.data[DOMAIN]["async_remove_tracker"]
+            _LOGGER.info("Periodic optimization tracker removed")
+        except Exception as e:
+            _LOGGER.error(f"Error removing optimization tracker: {e}")
+    
+    # Clean up debug service
+    if "debug_service" in hass.data[DOMAIN]:
+        try:
+            del hass.data[DOMAIN]["debug_service"]
+            _LOGGER.info("Debug service cleaned up")
+        except Exception as e:
+            _LOGGER.error(f"Error cleaning up debug service: {e}")
     
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     
@@ -87,352 +139,74 @@ async def async_register_services(hass: HomeAssistant):
     
     async def handle_run_optimization(call):
         """Handle run_optimization service call."""
+        _LOGGER.info("=== Service call: run_optimization ===")
+        
         try:
             genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
             if genetic_algo:
                 # Update parameters if provided
                 if 'population_size' in call.data:
                     genetic_algo.population_size = call.data['population_size']
+                    _LOGGER.info(f"Updated population size to: {call.data['population_size']}")
                 if 'generations' in call.data:
                     genetic_algo.generations = call.data['generations']
+                    _LOGGER.info(f"Updated generations to: {call.data['generations']}")
                 if 'mutation_rate' in call.data:
                     genetic_algo.mutation_rate = call.data['mutation_rate']
+                    _LOGGER.info(f"Updated mutation rate to: {call.data['mutation_rate']}")
                 if 'crossover_rate' in call.data:
                     genetic_algo.crossover_rate = call.data['crossover_rate']
+                    _LOGGER.info(f"Updated crossover rate to: {call.data['crossover_rate']}")
                 
-                # Run optimization asynchronously
-                await genetic_algo.run_optimization()
+                # Run optimization
+                _LOGGER.info("Running optimization...")
+                solution = await genetic_algo.optimize()
                 
-                # Update state asynchronously
-                await hass.states.async_set(
-                    "sensor.genetic_algorithm_status",
-                    "completed",
-                    attributes={
-                        "generation": genetic_algo.generations, 
-                        "best_fitness": genetic_algo.best_fitness
-                    }
-                )
-                
-                _LOGGER.info("Manual optimization triggered successfully")
-            else:
-                _LOGGER.error("Optimizer not available")
-        except Exception as e:
-            _LOGGER.error(f"Error in manual optimization: {e}")
-
-    async def handle_start_optimization(call):
-        """Handle start_optimization service call."""
-        try:
-            genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
-            if genetic_algo:
-                if "async_remove_tracker" not in hass.data[DOMAIN]:
-                    hass.data[DOMAIN]["async_remove_tracker"] = await genetic_algo.schedule_optimization()
-                    await hass.states.async_set(
-                        "sensor.genetic_algorithm_status",
-                        "started",
-                        attributes={"message": "Periodic optimization started"}
-                    )
-                    _LOGGER.info("Periodic optimization started successfully")
+                if solution is not None:
+                    _LOGGER.info("Optimization completed successfully")
+                    _LOGGER.info(f"Solution shape: {len(solution)} devices x {len(solution[0]) if solution[0] else 0} time slots")
                 else:
-                    _LOGGER.warning("Optimization tracker already active")
+                    _LOGGER.error("Optimization returned no solution")
+                    
             else:
-                _LOGGER.error("Optimizer not available")
-        except Exception as e:
-            _LOGGER.error(f"Error starting optimization: {e}")
-
-    async def handle_stop_optimization(call):
-        """Handle stop_optimization service call."""
-        try:
-            if "async_remove_tracker" in hass.data[DOMAIN]:
-                hass.data[DOMAIN]["async_remove_tracker"]()
-                del hass.data[DOMAIN]["async_remove_tracker"]
-                await hass.states.async_set(
-                    "sensor.genetic_algorithm_status",
-                    "stopped",
-                    attributes={"message": "Periodic optimization stopped"}
-                )
-                _LOGGER.info("Periodic optimization stopped successfully")
-            else:
-                _LOGGER.warning("No optimization tracker to stop")
-        except Exception as e:
-            _LOGGER.error(f"Error stopping optimization: {e}")
-
-    async def handle_toggle_scheduler(call):
-        """Handle toggle_scheduler service call."""
-        try:
-            genetic_algo = hass.data[DOMAIN].get('genetic_algorithm')
-            if genetic_algo:
-                mode = call.data.get('mode', 'genetic')
+                _LOGGER.error("Genetic algorithm not available")
                 
-                if mode == 'rule-based':
-                    # Generate rule-based schedule asynchronously
-                    schedule = await genetic_algo.rule_based_schedule()
-                    
-                    # Update device schedule entities
-                    if schedule is not None and hasattr(schedule, 'shape') and schedule.shape[0] > 0:
-                        for d in range(schedule.shape[0]):
-                            if schedule.shape[1] > 0:
-                                schedule_value = "on" if schedule[d][0] > 0.5 else "off"
-                                entity_id = f"switch.device_{d}_schedule"
-                                
-                                await hass.states.async_set(
-                                    entity_id,
-                                    schedule_value,
-                                    attributes={
-                                        "schedule": schedule[d].tolist() if hasattr(schedule[d], 'tolist') else schedule[d],
-                                        "scheduler_mode": "rule-based",
-                                        "timestamp": datetime.now().isoformat()
-                                    }
-                                )
-                    
-                    await hass.states.async_set(
-                        "sensor.genetic_algorithm_status",
-                        "rule-based",
-                        attributes={
-                            "message": "Rule-based scheduling active",
-                            "scheduler_mode": "rule-based",
-                            "timestamp": datetime.now().isoformat()
-                        }
-                    )
-                    _LOGGER.info("Switched to rule-based scheduling")
-                    
-                else:
-                    # Switch back to genetic algorithm
-                    await hass.states.async_set(
-                        "sensor.genetic_algorithm_status",
-                        "genetic",
-                        attributes={
-                            "message": "Genetic algorithm scheduling active",
-                            "scheduler_mode": "genetic",
-                            "timestamp": datetime.now().isoformat()
-                        }
-                    )
-                    _LOGGER.info("Switched to genetic algorithm scheduling")
+        except Exception as e:
+            _LOGGER.error(f"Error in run_optimization service: {e}")
+            _LOGGER.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            _LOGGER.error(f"Traceback: {traceback.format_exc()}")
+    
+    async def handle_debug_optimization(call):
+        """Handle debug_optimization service call."""
+        _LOGGER.info("=== Service call: debug_optimization ===")
+        
+        try:
+            debug_service = hass.data[DOMAIN].get('debug_service')
+            if debug_service:
+                await debug_service.debug_optimization(call)
             else:
-                _LOGGER.error("Optimizer not available")
+                _LOGGER.error("Debug service not available")
         except Exception as e:
-            _LOGGER.error(f"Error toggling scheduler: {e}")
-
-    async def handle_update_pricing_parameters(call):
-        """Handle updating pricing parameters."""
+            _LOGGER.error(f"Error in debug_optimization service: {e}")
+    
+    async def handle_generate_debug_report(call):
+        """Handle generate_debug_report service call."""
+        _LOGGER.info("=== Service call: generate_debug_report ===")
+        
         try:
-            config_updates = call.data
-            _LOGGER.info(f"Updating pricing parameters: {config_updates}")
-            
-            # Update the genetic algorithm configuration if it exists
-            if hasattr(hass.data[DOMAIN], 'genetic_algorithm'):
-                genetic_algo = hass.data[DOMAIN]['genetic_algorithm']
-                if hasattr(genetic_algo, 'pricing_calculator') and hasattr(genetic_algo.pricing_calculator, 'update_config'):
-                    genetic_algo.pricing_calculator.update_config(config_updates)
-                    _LOGGER.info("Pricing parameters updated successfully")
-                else:
-                    _LOGGER.warning("Pricing calculator not available for updates")
-            
-        except Exception as e:
-            _LOGGER.error(f"Error updating pricing parameters: {e}")
-
-    async def handle_get_full_schedule(call):
-        """Handle getting full schedule data."""
-        try:
-            target = call.data.get("target", {})
-            data_type = call.data.get("data_type", "full_schedule")
-            device_id = call.data.get("device_id")
-            
-            _LOGGER.info(f"Getting schedule data: type={data_type}, device_id={device_id}")
-            
-            # Get the target entity
-            entity_id = target.get("entity", {}).get("entity_id")
-            if not entity_id:
-                _LOGGER.error("No entity specified in target")
-                return
-            
-            # Get the entity state
-            entity_state = hass.states.get(entity_id)
-            if not entity_state:
-                _LOGGER.error(f"Entity {entity_id} not found")
-                return
-            
-            # Get the schedule data from the entity
-            schedule_data = entity_state.attributes.get("detailed_schedule") or entity_state.attributes.get("compressed_schedule")
-            
-            if not schedule_data:
-                _LOGGER.warning(f"No schedule data available for {entity_id}")
-                return
-            
-            # Process based on data type
-            if data_type == "summary_only":
-                result = {
-                    "entity_id": entity_id,
-                    "data_type": "summary",
-                    "data": entity_state.attributes.get("summary", {})
-                }
-            elif data_type == "device_schedule" and device_id is not None:
-                if "predicted_schedule" in schedule_data and len(schedule_data["predicted_schedule"]) > device_id:
-                    device_schedule = schedule_data["predicted_schedule"][device_id]
-                    result = {
-                        "entity_id": entity_id,
-                        "device_id": device_id,
-                        "data_type": "device_schedule",
-                        "data": device_schedule
-                    }
-                else:
-                    _LOGGER.error(f"Device {device_id} not found in schedule data")
-                    return
+            debug_service = hass.data[DOMAIN].get('debug_service')
+            if debug_service:
+                result = await debug_service.generate_debug_report(call)
+                _LOGGER.info(f"Debug report generation result: {result}")
             else:
-                # Return full or compressed schedule
-                result = {
-                    "entity_id": entity_id,
-                    "data_type": data_type,
-                    "data": schedule_data
-                }
-            
-            # Log the result (in production, you might want to return this via a different mechanism)
-            _LOGGER.info(f"Schedule data retrieved: {len(str(result))} characters")
-            
-            # You could also store this in a temporary entity or return via websocket
-            # For now, we'll just log it
-            
+                _LOGGER.error("Debug service not available")
         except Exception as e:
-            _LOGGER.error(f"Error getting full schedule: {e}")
-
-    async def handle_get_schedule_statistics(call):
-        """Handle getting schedule statistics."""
-        try:
-            target = call.data.get("target", {})
-            
-            # Get the target entity
-            entity_id = target.get("entity", {}).get("entity_id")
-            if not entity_id:
-                _LOGGER.error("No entity specified in target")
-                return
-            
-            # Get the entity state
-            entity_state = hass.states.get(entity_id)
-            if not entity_state:
-                _LOGGER.error(f"Entity {entity_id} not found")
-                return
-            
-            # Get the schedule data
-            schedule_data = entity_state.attributes.get("detailed_schedule") or entity_state.attributes.get("compressed_schedule")
-            
-            if not schedule_data:
-                _LOGGER.warning(f"No schedule data available for {entity_id}")
-                return
-            
-            # Calculate statistics
-            stats = calculate_schedule_statistics(schedule_data)
-            
-            # Log the statistics
-            _LOGGER.info(f"Schedule statistics for {entity_id}: {stats}")
-            
-        except Exception as e:
-            _LOGGER.error(f"Error getting schedule statistics: {e}")
-
-    async def handle_get_expanded_schedule(call):
-        """Handle getting expanded schedule data."""
-        try:
-            target = call.data.get("target", {})
-            
-            # Get the target entity
-            entity_id = target.get("entity", {}).get("entity_id")
-            if not entity_id:
-                _LOGGER.error("No entity specified in target")
-                return
-            
-            # Get the entity state
-            entity_state = hass.states.get(entity_id)
-            if not entity_state:
-                _LOGGER.error(f"Entity {entity_id} not found")
-                return
-            
-            # Check if this is a schedule visualization sensor
-            if "schedule_visualization" in entity_id:
-                # Get the sensor instance to access expansion method
-                for platform in hass.data[DOMAIN].get("platforms", []):
-                    if hasattr(platform, "entities"):
-                        for entity in platform.entities:
-                            if entity.entity_id == entity_id and hasattr(entity, "_expand_compressed_schedule"):
-                                expanded_data = entity._expand_compressed_schedule()
-                                _LOGGER.info(f"Expanded schedule data for {entity_id}: {len(str(expanded_data))} characters")
-                                return
-            
-            # Fallback: try to get from attributes
-            schedule_data = entity_state.attributes.get("schedule_data") or entity_state.attributes.get("compressed_schedule")
-            if schedule_data:
-                _LOGGER.info(f"Schedule data for {entity_id}: {len(str(schedule_data))} characters")
-            else:
-                _LOGGER.warning(f"No schedule data available for {entity_id}")
-            
-        except Exception as e:
-            _LOGGER.error(f"Error getting expanded schedule: {e}")
-
-    def calculate_schedule_statistics(schedule_data):
-        """Calculate statistics from schedule data."""
-        try:
-            stats = {
-                "total_devices": 0,
-                "total_time_slots": 0,
-                "average_device_usage": 0,
-                "peak_usage_time": None,
-                "peak_usage_value": 0
-            }
-            
-            if "predicted_schedule" in schedule_data:
-                schedule = schedule_data["predicted_schedule"]
-                stats["total_devices"] = len(schedule)
-                
-                if schedule:
-                    # Calculate total usage across all devices and time slots
-                    total_usage = 0
-                    time_slot_usage = []
-                    
-                    for device_schedule in schedule:
-                        if isinstance(device_schedule, dict) and "devices" in device_schedule:
-                            device_values = list(device_schedule["devices"].values())
-                        elif isinstance(device_schedule, list):
-                            device_values = device_schedule
-                        else:
-                            continue
-                        
-                        stats["total_time_slots"] = max(stats["total_time_slots"], len(device_values))
-                        total_usage += sum(device_values)
-                        
-                        # Track time slot usage
-                        for i, value in enumerate(device_values):
-                            while len(time_slot_usage) <= i:
-                                time_slot_usage.append(0)
-                            time_slot_usage[i] += value
-                    
-                    if stats["total_devices"] > 0:
-                        stats["average_device_usage"] = total_usage / stats["total_devices"]
-                    
-                    # Find peak usage time
-                    if time_slot_usage:
-                        peak_idx = time_slot_usage.index(max(time_slot_usage))
-                        stats["peak_usage_value"] = max(time_slot_usage)
-                        stats["peak_usage_time"] = f"Slot {peak_idx}"
-            
-            return stats
-            
-        except Exception as e:
-            _LOGGER.error(f"Error calculating schedule statistics: {e}")
-            return {"error": str(e)}
-
+            _LOGGER.error(f"Error in generate_debug_report service: {e}")
+    
     # Register services
-    hass.services.async_register(
-        DOMAIN, "run_optimization", handle_run_optimization
-    )
-    hass.services.async_register(
-        DOMAIN, "toggle_scheduler", handle_toggle_scheduler
-    )
-    hass.services.async_register(
-        DOMAIN, "update_pricing_parameters", handle_update_pricing_parameters
-    )
-    hass.services.async_register(
-        DOMAIN, "get_full_schedule", handle_get_full_schedule
-    )
-    hass.services.async_register(
-        DOMAIN, "get_schedule_statistics", handle_get_schedule_statistics
-    )
-    hass.services.async_register(
-        DOMAIN, "get_expanded_schedule", handle_get_expanded_schedule
-    )
+    hass.services.async_register(DOMAIN, "run_optimization", handle_run_optimization)
+    hass.services.async_register(DOMAIN, "debug_optimization", handle_debug_optimization)
+    hass.services.async_register(DOMAIN, "generate_debug_report", handle_generate_debug_report)
+    
+    _LOGGER.info("Custom services registered successfully")
