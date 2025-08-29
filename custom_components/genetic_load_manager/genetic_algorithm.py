@@ -301,10 +301,12 @@ class GeneticLoadOptimizer:
                 
                 # Create the final forecast array
                 self.pv_forecast = self._interpolate_forecast(times, values)
+                _LOGGER.info(f"PV forecast set from interpolation: {len(self.pv_forecast)} slots, max: {max(self.pv_forecast):.3f} kW")
             else:
                 _LOGGER.error("No valid forecast times found, using fallback zero forecast")
                 _LOGGER.error("This will result in zero PV generation forecast")
                 self.pv_forecast = pv_forecast
+                _LOGGER.warning(f"PV forecast set to fallback: {len(self.pv_forecast)} slots (all zeros)")
 
         # Fetch load forecast
         _LOGGER.info(f"Fetching load forecast from entity: {self.load_forecast_entity}")
@@ -448,8 +450,20 @@ class GeneticLoadOptimizer:
                 _LOGGER.info(f"Truncated pricing to {len(self.pricing)} slots")
         
         _LOGGER.debug(f"Final pricing array: {len(self.pricing)} slots, sample values: {self.pricing[:5]}")
-        self.pv_forecast = pv_forecast
-        _LOGGER.debug(f"PV forecast (96 slots): {pv_forecast}")
+        # Note: self.pv_forecast is already set correctly above from interpolation or fallback
+        _LOGGER.debug(f"PV forecast (96 slots): {self.pv_forecast}")
+        
+        # Final validation: Ensure PV forecast was not overwritten and contains valid data
+        if not hasattr(self, 'pv_forecast') or self.pv_forecast is None:
+            _LOGGER.error("CRITICAL ERROR: PV forecast is None after processing!")
+            self.pv_forecast = [0.0] * self.time_slots
+        elif len(self.pv_forecast) != self.time_slots:
+            _LOGGER.error(f"CRITICAL ERROR: PV forecast size mismatch: {len(self.pv_forecast)} != {self.time_slots}")
+            self.pv_forecast = [0.0] * self.time_slots
+        elif all(x == 0.0 for x in self.pv_forecast):
+            _LOGGER.warning("PV forecast contains all zeros - this may indicate a data processing issue")
+        else:
+            _LOGGER.info(f"PV forecast validation passed: {len(self.pv_forecast)} slots, max: {max(self.pv_forecast):.3f} kW")
         
         _LOGGER.info("=== Forecast data fetch completed ===")
         _LOGGER.info(f"PV forecast: {len(self.pv_forecast)} slots, max: {max(self.pv_forecast):.3f} kW")
@@ -488,6 +502,12 @@ class GeneticLoadOptimizer:
                 _LOGGER.error(f"Forecast data size mismatch: PV={len(self.pv_forecast)}, Pricing={len(self.pricing)}, Expected={self.time_slots}")
                 _LOGGER.error("This indicates a data initialization problem")
                 return -1000.0
+            
+            # Check for zero PV forecast (indicates data processing failure)
+            if all(x == 0.0 for x in self.pv_forecast):
+                _LOGGER.error("CRITICAL ERROR: PV forecast contains all zeros - solar optimization will be ineffective!")
+                _LOGGER.error("This indicates the PV forecast data was not properly processed or was overwritten")
+                return -1000.0  # Heavy penalty for invalid PV data
             
             # Validate chromosome structure
             if not isinstance(chromosome, list) or len(chromosome) != self.num_devices:
