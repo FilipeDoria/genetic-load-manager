@@ -317,36 +317,46 @@ class GeneticLoadOptimizer:
                 )
                 if load_state and load_state.state not in ['unknown', 'unavailable']:
                     try:
-                        forecast_data = load_state.attributes.get("forecast", [0.1] * self.time_slots)
-                        _LOGGER.debug(f"Load forecast data: {len(forecast_data)} items")
+                        forecast_data = load_state.attributes.get("forecast", None)
+                        _LOGGER.debug(f"Load forecast data: {len(forecast_data) if forecast_data else 'None'} items")
                         _LOGGER.debug(f"Sample data: {forecast_data[:5] if forecast_data else 'None'}")
                         
-                        self.load_forecast = [float(x) for x in forecast_data]
-                        if len(self.load_forecast) != self.time_slots:
-                            _LOGGER.warning(f"Load forecast size mismatch: got {len(self.load_forecast)}, expected {self.time_slots}")
-                            # Resize to match time slots
-                            if len(self.load_forecast) < self.time_slots:
-                                self.load_forecast.extend([0.1] * (self.time_slots - len(self.load_forecast)))
-                                _LOGGER.info(f"Extended load forecast to {len(self.load_forecast)} slots")
-                            elif len(self.load_forecast) > self.time_slots:
-                                self.load_forecast = self.load_forecast[:self.time_slots]
-                                _LOGGER.info(f"Truncated load forecast to {len(self.load_forecast)} slots")
-                        _LOGGER.info(f"Successfully loaded load forecast: {len(self.load_forecast)} slots")
+                        if forecast_data and isinstance(forecast_data, list) and len(forecast_data) > 0:
+                            # Use provided forecast data
+                            self.load_forecast = [float(x) for x in forecast_data]
+                            if len(self.load_forecast) != self.time_slots:
+                                _LOGGER.warning(f"Load forecast size mismatch: got {len(self.load_forecast)}, expected {self.time_slots}")
+                                # Resize to match time slots
+                                if len(self.load_forecast) < self.time_slots:
+                                    extension_values = self._get_realistic_load_extension(len(self.load_forecast), self.time_slots)
+                                    self.load_forecast.extend(extension_values)
+                                    _LOGGER.info(f"Extended forecast to {len(self.load_forecast)} slots with realistic values")
+                                elif len(self.load_forecast) > self.time_slots:
+                                    self.load_forecast = self.load_forecast[:self.time_slots]
+                                    _LOGGER.info(f"Truncated forecast to {len(self.load_forecast)} slots")
+                            _LOGGER.info(f"Successfully loaded load forecast: {len(self.load_forecast)} slots")
+                        else:
+                            _LOGGER.warning("No valid forecast data found, generating smart forecast from historical data")
+                            self.load_forecast = await self._generate_smart_load_forecast()
                     except (ValueError, TypeError) as e:
                         _LOGGER.error(f"Error parsing load forecast data: {e}")
                         _LOGGER.error(f"Raw forecast data: {forecast_data}")
-                        self.load_forecast = [0.1] * self.time_slots
+                        _LOGGER.warning("Generating smart forecast due to parsing error")
+                        self.load_forecast = await self._generate_smart_load_forecast()
                 else:
                     _LOGGER.error(f"Load forecast entity unavailable: {self.load_forecast_entity}")
                     _LOGGER.error(f"Entity state: {load_state.state if load_state else 'None'}")
-                    self.load_forecast = [0.1] * self.time_slots
+                    _LOGGER.warning("Generating smart forecast due to entity unavailability")
+                    self.load_forecast = await self._generate_smart_load_forecast()
             except Exception as e:
                 _LOGGER.error(f"Exception while fetching load forecast: {e}")
                 _LOGGER.error(f"Exception type: {type(e).__name__}")
-                self.load_forecast = [0.1] * self.time_slots
+                _LOGGER.warning("Generating smart forecast due to exception")
+                self.load_forecast = await self._generate_smart_load_forecast()
         else:
             _LOGGER.warning("No load forecast entity configured")
-            self.load_forecast = [0.1] * self.time_slots
+            _LOGGER.warning("Generating smart forecast as no entity configured")
+            self.load_forecast = await self._generate_smart_load_forecast()
 
         # Fetch battery state and pricing
         _LOGGER.info(f"Fetching battery SOC from entity: {self.battery_soc_entity}")
@@ -1117,6 +1127,158 @@ class GeneticLoadOptimizer:
                         schedule[d][t] = 1.0
         
         return schedule
+
+    async def _generate_smart_load_forecast(self):
+        """Generates a smart load forecast based on historical data and daily patterns."""
+        _LOGGER.info("Generating smart load forecast...")
+        smart_forecast = []
+        
+        # Fetch historical load data from the load_forecast_entity
+        if self.load_forecast_entity:
+            try:
+                load_state = await self.hass.async_add_executor_job(
+                    self.hass.states.get, self.load_forecast_entity
+                )
+                if load_state and load_state.state not in ['unknown', 'unavailable']:
+                    try:
+                        historical_data = load_state.attributes.get("forecast", [])
+                        _LOGGER.debug(f"Historical load data: {len(historical_data)} items")
+                        _LOGGER.debug(f"Sample data: {historical_data[:5] if historical_data else 'None'}")
+                        
+                        if historical_data and isinstance(historical_data, list) and len(historical_data) > 0:
+                            # Use provided historical data
+                            smart_forecast = [float(x) for x in historical_data]
+                            if len(smart_forecast) != self.time_slots:
+                                _LOGGER.warning(f"Historical load forecast size mismatch: got {len(smart_forecast)}, expected {self.time_slots}")
+                                # Resize to match time slots
+                                if len(smart_forecast) < self.time_slots:
+                                    smart_forecast.extend([0.1] * (self.time_slots - len(smart_forecast)))
+                                    _LOGGER.info(f"Extended historical forecast to {len(smart_forecast)} slots")
+                                elif len(smart_forecast) > self.time_slots:
+                                    smart_forecast = smart_forecast[:self.time_slots]
+                                    _LOGGER.info(f"Truncated historical forecast to {len(smart_forecast)} slots")
+                            _LOGGER.info(f"Successfully loaded historical load forecast: {len(smart_forecast)} slots")
+                        else:
+                            _LOGGER.warning("No valid historical load data found, using fallback 0.1 kW")
+                            smart_forecast = [0.1] * self.time_slots
+                    except (ValueError, TypeError) as e:
+                        _LOGGER.error(f"Error parsing historical load data: {e}")
+                        _LOGGER.error(f"Raw historical data: {historical_data}")
+                        _LOGGER.warning("Generating smart forecast due to parsing error")
+                        smart_forecast = [0.1] * self.time_slots
+                else:
+                    _LOGGER.error(f"Historical load entity unavailable: {self.load_forecast_entity}")
+                    _LOGGER.error(f"Entity state: {load_state.state if load_state else 'None'}")
+                    _LOGGER.warning("Generating smart forecast due to entity unavailability")
+                    smart_forecast = [0.1] * self.time_slots
+            except Exception as e:
+                _LOGGER.error(f"Exception while fetching historical load data: {e}")
+                _LOGGER.error(f"Exception type: {type(e).__name__}")
+                _LOGGER.warning("Generating smart forecast due to exception")
+                smart_forecast = [0.1] * self.time_slots
+        else:
+            _LOGGER.warning("No historical load entity configured, using fallback 0.1 kW")
+            smart_forecast = [0.1] * self.time_slots
+
+        # Apply daily patterns to the historical data
+        _LOGGER.info("Applying daily patterns to historical load data...")
+        daily_pattern = self._generate_daily_pattern(smart_forecast)
+        _LOGGER.debug(f"Daily pattern: {daily_pattern}")
+
+        # Create the final smart forecast by repeating the daily pattern
+        smart_forecast = daily_pattern * (self.time_slots // len(daily_pattern)) + daily_pattern[:self.time_slots % len(daily_pattern)]
+        _LOGGER.info(f"Generated smart load forecast: {len(smart_forecast)} slots")
+        return smart_forecast
+
+    def _get_realistic_load_extension(self, current_length, target_length):
+        """Generate realistic extension values for load forecast based on time of day."""
+        extension_length = target_length - current_length
+        if extension_length <= 0:
+            return []
+        
+        # Calculate what time of day the extension represents
+        # Each slot is 15 minutes, so we can determine the hour
+        start_hour = (current_length // 4) % 24
+        
+        extension_values = []
+        for i in range(extension_length):
+            hour = (start_hour + (i // 4)) % 24
+            
+            # Generate realistic values based on time of day
+            if 6 <= hour <= 9:  # Morning peak
+                value = 0.8 + (i % 4) * 0.1  # 0.8 to 1.1 kW
+            elif 17 <= hour <= 22:  # Evening peak
+                value = 1.5 + (i % 4) * 0.2  # 1.5 to 2.3 kW
+            elif 23 <= hour or hour <= 5:  # Night
+                value = 0.2 + (i % 4) * 0.05  # 0.2 to 0.35 kW
+            else:  # Daytime
+                value = 0.4 + (i % 4) * 0.1  # 0.4 to 0.7 kW
+            
+            extension_values.append(round(value, 2))
+        
+        return extension_values
+
+    def _generate_daily_pattern(self, historical_data):
+        """Generates a daily pattern from historical load data."""
+        if not historical_data or len(historical_data) < 24:
+            _LOGGER.warning("Not enough historical data to generate a daily pattern.")
+            return self._generate_realistic_daily_pattern()
+
+        # Extract daily load patterns from historical data
+        daily_loads = []
+        for i in range(24):
+            daily_load = sum(historical_data[j] for j in range(i, len(historical_data), 24))
+            daily_loads.append(daily_load)
+
+        # Find the most common daily load pattern
+        from collections import Counter
+        pattern_counts = Counter(daily_loads)
+        most_common_pattern = pattern_counts.most_common(1)[0][0]
+
+        # Create a list of 24 values, each representing the average load for that hour
+        # This is a simplified approach; a more sophisticated model would use regression
+        # or a more complex pattern recognition.
+        # For now, we'll just repeat the most common daily pattern.
+        return [most_common_pattern] * 24
+
+    def _generate_realistic_daily_pattern(self):
+        """Generates a realistic daily load pattern based on typical household usage."""
+        _LOGGER.info("Generating realistic daily load pattern...")
+        
+        # Create a realistic daily load pattern (24 hourly values)
+        # Based on typical household energy usage patterns
+        
+        # Morning peak (6-9 AM): cooking, showers, heating
+        morning_peak = [0.8, 1.2, 1.5, 1.8, 2.0, 1.8, 1.5, 1.2, 0.8, 0.6, 0.5, 0.4]
+        
+        # Daytime (9 AM - 5 PM): lower usage, some appliances
+        daytime = [0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+        daytime.extend([0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+        daytime.extend([0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+        daytime.extend([0.4, 0.3, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+        
+        # Evening peak (5-10 PM): cooking, lighting, entertainment, heating
+        evening_peak = [1.0, 1.5, 2.0, 2.5, 3.0, 2.8, 2.5, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.3, 0.3]
+        
+        # Night (10 PM - 6 AM): minimal usage, some standby devices
+        night = [0.3, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+        
+        # Combine all patterns
+        daily_pattern = morning_peak + daytime + evening_peak + night
+        
+        # Ensure we have exactly 24 hours
+        if len(daily_pattern) != 24:
+            _LOGGER.warning(f"Daily pattern length mismatch: {len(daily_pattern)} != 24")
+            # Pad or truncate to 24 hours
+            if len(daily_pattern) < 24:
+                daily_pattern.extend([0.3] * (24 - len(daily_pattern)))
+            else:
+                daily_pattern = daily_pattern[:24]
+        
+        _LOGGER.info(f"Generated realistic daily pattern: {len(daily_pattern)} hours, total: {sum(daily_pattern):.2f} kWh")
+        _LOGGER.debug(f"Pattern range: {min(daily_pattern):.2f} - {max(daily_pattern):.2f} kW")
+        
+        return daily_pattern
 
     def _log_event(self, level, message):
         """Log an event with the specified level."""
